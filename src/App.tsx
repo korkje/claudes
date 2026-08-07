@@ -274,7 +274,7 @@ export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpda
                 index={pathsIndex}
                 onIndexChange={setPathsIndex}
                 notice={notice}
-                footer="↵ add · d delete · esc back"
+                footer="d delete · esc back"
                 onAction={({ input, key, index }) => {
                     setNotice(null);
                     if (key.return && index === entries.length) {

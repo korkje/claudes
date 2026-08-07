@@ -376,7 +376,7 @@ export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpda
             );
         }
         if (row.type === "path") {
-            return <Text key={`path:${row.base}`} dimColor>{"  "}{row.base}</Text>;
+            return <Text key={`path:${row.base}`}>{"  "}{row.base}</Text>;
         }
         if (row.type === "addPath") {
             return <Text key={`addPath:${row.account}`} dimColor>{"  "}+ add path</Text>;
@@ -388,6 +388,17 @@ export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpda
     const hideAliasHint = shellTargets().some(
         target => target.id === currentShell() && isAliasEnabled(target),
     );
+
+    const setPathsOpen = (account: string, open: boolean) => {
+        if (expanded.has(account) === open) return;
+        const next = new Set(expanded);
+        if (open) next.add(account);
+        else next.delete(account);
+        setExpanded(next);
+        // keep the cursor on the toggled account's own row
+        setListIndex(Math.max(0, buildRows(accounts, basePaths, next)
+            .findIndex(r => r.type === "account" && r.name === account)));
+    };
 
     return (
         <Box flexDirection="column">
@@ -403,7 +414,8 @@ export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpda
                 footer={`↵ launch · d delete · p paths${hideAliasHint ? "" : " · a alias"} · esc quit`}
                 onAction={({ input, key, index }) => {
                     setNotice(null);
-                    if (key.return || key.escape || ["d", "p", "a"].includes(input)) {
+                    if (key.return || key.escape || key.leftArrow || key.rightArrow
+                        || ["d", "p", "a"].includes(input)) {
                         setCountdown(null);
                     }
                     const row = rows[index];
@@ -419,13 +431,11 @@ export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpda
                         }
                     } else if (input === "p" && row.type !== "newAccount") {
                         const account = row.type === "account" ? row.name : row.account;
-                        const next = new Set(expanded);
-                        if (next.has(account)) next.delete(account);
-                        else next.add(account);
-                        setExpanded(next);
-                        // keep the cursor on the toggled account's own row
-                        setListIndex(Math.max(0, buildRows(accounts, basePaths, next)
-                            .findIndex(r => r.type === "account" && r.name === account)));
+                        setPathsOpen(account, !expanded.has(account));
+                    } else if ((key.rightArrow || key.leftArrow) && row.type !== "newAccount") {
+                        // undocumented: right opens, left closes
+                        const account = row.type === "account" ? row.name : row.account;
+                        setPathsOpen(account, key.rightArrow);
                     } else if (input === "d") {
                         if (row.type === "account") {
                             if (row.name === DEFAULT_ACCOUNT) {

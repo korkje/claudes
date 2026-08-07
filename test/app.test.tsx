@@ -188,6 +188,26 @@ describe("base paths", () => {
         unmount();
     });
 
+    it("right/left arrows expand and collapse (undocumented)", async () => {
+        mkdirSync(join(homedir(), ".claude"));
+        writeFileSync(
+            join(homedir(), ".claudes.json"),
+            JSON.stringify({ basePaths: { "~/dev": "~/.claude" } }),
+        );
+        const { stdin, lastFrame, unmount } = renderApp();
+        await delay();
+        stdin.write("[C"); // right -> open
+        await delay();
+        expect(lastFrame()).toContain("~/dev");
+        stdin.write("[B"); // down onto the path row
+        await delay();
+        stdin.write("[D"); // left -> close from a child row
+        await delay();
+        expect(lastFrame()).not.toContain("~/dev");
+        expect(lastFrame()).not.toContain("← close"); // hint stays undocumented
+        unmount();
+    });
+
     it("deletes the selected mapping with d", async () => {
         mkdirSync(join(homedir(), ".claude"));
         writeFileSync(

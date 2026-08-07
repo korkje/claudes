@@ -1,6 +1,6 @@
 {
   "name": "@korkje/claudes",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Multi-account launcher for Claude Code — manage and switch between CLAUDE_CONFIG_DIR profiles",
   "keywords": [
     "claude",

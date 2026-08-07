@@ -16,7 +16,7 @@ Requires `claude` on your PATH.
 
 ```sh
 claudes            # interactive UI
-claudes -- -r      # skip the UI: auto-resolve the account, pass args to claude
+claudes -- -r      # interactive UI, passing -r through to claude on launch
 ```
 
 Everything is managed from the interactive UI:
@@ -31,6 +31,8 @@ Everything is managed from the interactive UI:
 
 Your regular `~/.claude` appears as `default (~/.claude)` — listed first (when the folder exists) and impossible to delete. The list preselects the base path match for your working directory, or else the top entry.
 
+On startup the UI checks npm for a newer claudes release in the background and shows a one-line notice when there is one; the check never blocks and failures (e.g. offline) are silent.
+
 ## Base paths
 
 The `p` screen maps directories to accounts, so starting `claudes` inside a mapped directory preselects that account (longest match wins) and auto-launches it after a short countdown — navigating or using a shortcut cancels (unbound keys are ignored). Add a mapping with `a` — the directory input defaults to your cwd — then pick the account for it. Remove one with `d`.
@@ -43,11 +45,11 @@ To route plain `claude` through claudes, press `a` in the UI — an interactive 
 alias claude="claudes --"
 ```
 
-Bare `claude` opens the UI; `claude -r`, `claude --model opus`, etc. skip it, auto-resolve the account (base path match → default), and pass everything through — so `claude` inside a mapped directory silently uses the right account. Since aliases only exist in your interactive shell, IDE integrations and scripts that spawn `claude` still get the real CLI (as does claudes itself — no recursion). For claudes' own help/version, call the unaliased `claudes -h`.
+`claude`, `claude -r`, `claude --model opus`, etc. all open the UI, and any arguments are passed through to `claude` when an account launches — so `claude -r` inside a mapped directory shows the selector for a moment, then resumes with the right account (or immediately, with `enter`). Since aliases only exist in your interactive shell, IDE integrations and scripts that spawn `claude` still get the real CLI (as does claudes itself — no recursion). For claudes' own help/version, call the unaliased `claudes -h`.
 
 ## Non-interactive use
 
-When stdin is not a TTY (pipes, scripts), `claudes` likewise skips the UI and auto-resolves the account.
+When stdin is not a TTY (pipes, scripts), `claudes` skips the UI and auto-resolves the account (base path match → default), passing any arguments through.
 
 ## Development
 

@@ -13,6 +13,7 @@ import {
     validateName,
 } from "../src/accounts.js";
 import { contractTilde, expandTilde, loadConfig, saveConfig } from "../src/config.js";
+import { currentVersion, isNewer } from "../src/version.js";
 
 export function resetHome(): void {
     for (const entry of readdirSync(homedir())) {
@@ -135,5 +136,20 @@ describe("config", () => {
         expect(expandTilde("~/a/b")).toBe(join(homedir(), "a", "b"));
         expect(contractTilde(join(homedir(), "a"))).toBe("~/a");
         expect(contractTilde("/other/a")).toBe("/other/a");
+    });
+});
+
+describe("version", () => {
+    it("reads the package version", () => {
+        expect(currentVersion()).toMatch(/^\d+\.\d+\.\d+/);
+    });
+
+    it("compares versions numerically", () => {
+        expect(isNewer("0.2.0", "0.1.3")).toBe(true);
+        expect(isNewer("0.1.10", "0.1.3")).toBe(true);
+        expect(isNewer("1.0.0", "0.9.9")).toBe(true);
+        expect(isNewer("0.1.3", "0.1.3")).toBe(false);
+        expect(isNewer("0.1.2", "0.1.3")).toBe(false);
+        expect(isNewer("0.1.3.1", "0.1.3")).toBe(true);
     });
 });

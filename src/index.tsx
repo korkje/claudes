@@ -72,6 +72,10 @@ async function main(): Promise<void> {
     await waitUntilExit();
     if (selected !== null) {
         launchClaude(selected, claudeArgs);
+    } else {
+        // exit explicitly: a pending update-check fetch would otherwise keep
+        // the event loop (and the process) alive after quitting the UI
+        process.exit(0);
     }
 }
 

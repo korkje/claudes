@@ -18,7 +18,8 @@ claude with CLAUDE_CONFIG_DIR pointing at the selected one:
   ↑/↓ or j/k   move
   enter        launch the selected account (or create one via "+ new account")
   d            delete account (asks for confirmation)
-  p            manage base paths (directory → account auto-selection)
+  p            show/hide the account's base paths (directory → account
+               auto-selection): d removes one, "+ add path" adds one
   esc          back, quit from the account list
 
 When stdin is not a TTY (pipes, scripts) the UI is skipped and the account

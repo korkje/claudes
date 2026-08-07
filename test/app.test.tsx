@@ -122,41 +122,69 @@ describe("delete", () => {
 });
 
 describe("base paths", () => {
-    it("adds a mapping for the cwd via the + add path row", async () => {
+    it("p expands and collapses an account's paths inline", async () => {
+        mkdirSync(join(homedir(), ".claude"));
+        writeFileSync(
+            join(homedir(), ".claudes.json"),
+            JSON.stringify({ basePaths: { "~/dev": "~/.claude" } }),
+        );
+        const { stdin, lastFrame, unmount } = renderApp();
+        await delay();
+        expect(lastFrame()).not.toContain("~/dev");
+        stdin.write("p");
+        await delay();
+        expect(lastFrame()).toContain("~/dev");
+        expect(lastFrame()).toContain("+ add path");
+        stdin.write("p");
+        await delay();
+        expect(lastFrame()).not.toContain("~/dev");
+        expect(lastFrame()).not.toContain("+ add path");
+        unmount();
+    });
+
+    it("adds a mapping for the cwd to the expanded account", async () => {
         mkdirSync(join(homedir(), ".claude"));
         const { stdin, lastFrame, unmount } = renderApp();
         await delay();
         stdin.write("p");
         await delay();
-        expect(lastFrame()).toContain("+ add path"); // only row when empty
+        stdin.write("j"); // onto the indented "+ add path" row
+        await delay();
         stdin.write("\r");
         await delay();
+        expect(lastFrame()).toContain("Add base path for default");
         expect(lastFrame()).toContain(process.cwd());
-        stdin.write("\r"); // accept prefilled cwd
-        await delay();
-        expect(lastFrame()).toContain("Account for");
-        stdin.write("\r"); // assign to the first account (default)
+        stdin.write("\r"); // accept prefilled cwd — assigns to that account
         await delay();
         expect(loadConfig().basePaths).toEqual({ [process.cwd()]: "~/.claude" });
+        expect(lastFrame()).toContain("Select account");
+        expect(lastFrame()).toContain(process.cwd()); // visible under the account
         unmount();
     });
 
-    it("esc goes back to the list, and quits from the list", async () => {
+    it("esc leaves the path input, then quits from the list", async () => {
         mkdirSync(join(homedir(), ".claude"));
         const ESC = "\u001B";
         const { stdin, lastFrame, unmount } = renderApp();
         await delay();
         stdin.write("p");
         await delay();
-        expect(lastFrame()).toContain("Base paths");
+        stdin.write("j");
+        await delay();
+        stdin.write("\r");
+        await delay();
+        expect(lastFrame()).toContain("Add base path");
         stdin.write(ESC); // esc -> back to the account list
         await delay(600); // lone escape can be held briefly by the input parser
         expect(lastFrame()).toContain("Select account");
+        stdin.write("p"); // collapse again (cursor is within the account's rows)
+        await delay();
+        expect(lastFrame()).not.toContain("+ add path");
         stdin.write(ESC); // esc on the list -> quit
         await delay(600);
         stdin.write("p"); // exited: input is no longer handled
         await delay();
-        expect(lastFrame()).not.toContain("Base paths");
+        expect(lastFrame()).not.toContain("+ add path");
         unmount();
     });
 
@@ -171,6 +199,8 @@ describe("base paths", () => {
         stdin.write("p");
         await delay();
         expect(lastFrame()).toContain("~/dev");
+        stdin.write("j"); // onto the ~/dev row
+        await delay();
         stdin.write("d");
         await delay();
         expect(lastFrame()).not.toContain("~/dev");

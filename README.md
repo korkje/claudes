@@ -25,8 +25,8 @@ Everything is managed from the interactive UI:
 | --- | --- |
 | `↑`/`↓` or `j`/`k` | move |
 | `enter` | launch the selected account, or create one via the `+ new account` row |
-| `d` | delete account (asks for confirmation) |
-| `p` | manage base paths |
+| `d` | delete account (asks for confirmation), or a base path mapping |
+| `p` | show/hide the account's base paths |
 | `esc` | back — quits from the account list |
 
 Your regular `~/.claude` appears as `default (~/.claude)` — listed first (when the folder exists) and impossible to delete. The list preselects the base path match for your working directory, or else the top entry.
@@ -35,7 +35,9 @@ On startup the UI checks npm for a newer claudes release in the background and s
 
 ## Base paths
 
-The `p` screen maps directories to accounts, so starting `claudes` inside a mapped directory preselects that account (longest match wins) and auto-launches it after a short countdown — navigating or using a shortcut cancels (unbound keys are ignored). Add a mapping via the `+ add path` row — the directory input defaults to your cwd — then pick the account for it. Remove one with `d`.
+Base paths map directories to accounts: starting `claudes` inside a mapped directory preselects that account (longest match wins) and auto-launches it after a short countdown — navigating or using a shortcut cancels (unbound keys are ignored).
+
+They're managed inline: press `p` on an account to expand its paths as an indented list below it (press again to collapse). `d` on a path removes the mapping, and the indented `+ add path` row maps a new directory to that account — the input defaults to your cwd.
 
 ## Replacing `claude`
 

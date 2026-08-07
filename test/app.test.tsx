@@ -14,7 +14,7 @@ beforeEach(() => {
     }
 });
 
-function renderApp(props: { countdownSeconds?: number; viaAlias?: boolean } = {}) {
+function renderApp(props: { countdownSeconds?: number } = {}) {
     const onLaunch = vi.fn();
     const app = render(<App onLaunch={onLaunch} {...props} />);
     return { ...app, onLaunch };
@@ -220,29 +220,20 @@ describe("alias", () => {
         unmount();
     });
 
-    it("shows the alias hint when run as claudes, even with the alias enabled", async () => {
+    it("shows the alias hint while the alias is not enabled", async () => {
         mkdirSync(join(homedir(), ".claude"));
-        writeFileSync(join(homedir(), ".zshrc"), 'alias claude="claudes --"\n');
         const { lastFrame, unmount } = renderApp();
         await delay();
         expect(lastFrame()).toContain("a alias");
         unmount();
     });
 
-    it("hides the alias hint when launched through the alias", async () => {
+    it("hides the alias hint once the alias is enabled for the current shell", async () => {
         mkdirSync(join(homedir(), ".claude"));
         writeFileSync(join(homedir(), ".zshrc"), 'alias claude="claudes --"\n');
-        const { lastFrame, unmount } = renderApp({ viaAlias: true });
+        const { lastFrame, unmount } = renderApp();
         await delay();
         expect(lastFrame()).not.toContain("a alias");
-        unmount();
-    });
-
-    it("shows the alias hint for a manual claudes -- without the alias set up", async () => {
-        mkdirSync(join(homedir(), ".claude"));
-        const { lastFrame, unmount } = renderApp({ viaAlias: true });
-        await delay();
-        expect(lastFrame()).toContain("a alias");
         unmount();
     });
 });

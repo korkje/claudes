@@ -155,11 +155,9 @@ function ConfirmScreen({ message, onResult }: {
     );
 }
 
-export function App({ onLaunch, countdownSeconds = 3, viaAlias = false }: {
+export function App({ onLaunch, countdownSeconds = 3 }: {
     onLaunch: (name: string) => void;
     countdownSeconds?: number;
-    // invoked with "--", which is how the claude alias calls claudes
-    viaAlias?: boolean;
 }) {
     const { exit } = useApp();
     const [config, setConfig] = useState<Config>(() => loadConfig());
@@ -390,9 +388,8 @@ export function App({ onLaunch, countdownSeconds = 3, viaAlias = false }: {
     });
     items.push(<Text dimColor key="__new">+ new account</Text>);
 
-    // hide the alias hint only when this launch came through the alias:
-    // invoked with "--" AND the alias really is enabled for the shell
-    const hideAliasHint = viaAlias && shellTargets().some(
+    // no need to advertise the alias once it's enabled for the user's shell
+    const hideAliasHint = shellTargets().some(
         target => target.id === currentShell() && isAliasEnabled(target),
     );
 

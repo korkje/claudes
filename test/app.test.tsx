@@ -141,6 +141,25 @@ describe("base paths", () => {
         unmount();
     });
 
+    it("esc goes back to the list, and quits from the list", async () => {
+        mkdirSync(join(homedir(), ".claude"));
+        const ESC = "\u001B";
+        const { stdin, lastFrame, unmount } = renderApp();
+        await delay();
+        stdin.write("p");
+        await delay();
+        expect(lastFrame()).toContain("Base paths");
+        stdin.write(ESC); // esc -> back to the account list
+        await delay(600); // lone escape can be held briefly by the input parser
+        expect(lastFrame()).toContain("Select account");
+        stdin.write(ESC); // esc on the list -> quit
+        await delay(600);
+        stdin.write("p"); // exited: input is no longer handled
+        await delay();
+        expect(lastFrame()).not.toContain("Base paths");
+        unmount();
+    });
+
     it("deletes the selected mapping with d", async () => {
         mkdirSync(join(homedir(), ".claude"));
         writeFileSync(

@@ -19,7 +19,7 @@ claude with CLAUDE_CONFIG_DIR pointing at the selected one:
   enter        launch the selected account (or create one via "+ new account")
   d            delete account (asks for confirmation)
   p            manage base paths (directory → account auto-selection)
-  q / esc      quit
+  esc          back, quit from the account list
 
 When stdin is not a TTY (pipes, scripts) the UI is skipped and the account
 resolves automatically: the base path match for the working directory, or

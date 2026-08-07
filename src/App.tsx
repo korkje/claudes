@@ -285,7 +285,7 @@ export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpda
                         delete basePaths[base];
                         updateConfig({ ...config, basePaths });
                         setPathsIndex(i => Math.max(0, Math.min(i, entries.length - 1)));
-                    } else if (key.escape || input === "q") {
+                    } else if (key.escape) {
                         setScreen({ id: "list" });
                     }
                 }}
@@ -352,7 +352,7 @@ export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpda
                             enableAlias(target);
                             setNotice(`Added to ${rc} — takes effect in new shells`);
                         }
-                    } else if (key.escape || input === "q") {
+                    } else if (key.escape) {
                         setNotice(null);
                         setScreen({ id: "list" });
                     }
@@ -378,7 +378,7 @@ export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpda
                         });
                         setNotice(`${base} → ${accountLabel(accounts[index])}`);
                         setScreen({ id: "paths" });
-                    } else if (key.escape || input === "q") {
+                    } else if (key.escape) {
                         setScreen({ id: "paths" });
                     }
                 }}
@@ -417,10 +417,10 @@ export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpda
                     setListIndex(index);
                 }}
                 notice={notice}
-                footer={`↵ launch · d delete · p paths${hideAliasHint ? "" : " · a alias"} · q quit`}
+                footer={`↵ launch · d delete · p paths${hideAliasHint ? "" : " · a alias"} · esc quit`}
                 onAction={({ input, key, index }) => {
                     setNotice(null);
-                    if (key.return || key.escape || ["d", "p", "a", "q"].includes(input)) {
+                    if (key.return || key.escape || ["d", "p", "a"].includes(input)) {
                         setCountdown(null);
                     }
                     const onCreateRow = index === accounts.length;
@@ -442,7 +442,7 @@ export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpda
                         setScreen({ id: "paths" });
                     } else if (input === "a") {
                         setScreen({ id: "alias" });
-                    } else if (input === "q" || key.escape) {
+                    } else if (key.escape) {
                         exit();
                     }
                 }}

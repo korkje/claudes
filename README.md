@@ -27,7 +27,7 @@ Everything is managed from the interactive UI:
 | `enter` | launch the selected account, or create one via the `+ new account` row |
 | `d` | delete account (asks for confirmation) |
 | `p` | manage base paths |
-| `q` / `esc` | quit |
+| `esc` | back — quits from the account list |
 
 Your regular `~/.claude` appears as `default (~/.claude)` — listed first (when the folder exists) and impossible to delete. The list preselects the base path match for your working directory, or else the top entry.
 

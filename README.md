@@ -35,7 +35,7 @@ On startup the UI checks npm for a newer claudes release in the background and s
 
 ## Base paths
 
-The `p` screen maps directories to accounts, so starting `claudes` inside a mapped directory preselects that account (longest match wins) and auto-launches it after a short countdown — navigating or using a shortcut cancels (unbound keys are ignored). Add a mapping with `a` — the directory input defaults to your cwd — then pick the account for it. Remove one with `d`.
+The `p` screen maps directories to accounts, so starting `claudes` inside a mapped directory preselects that account (longest match wins) and auto-launches it after a short countdown — navigating or using a shortcut cancels (unbound keys are ignored). Add a mapping via the `+ add path` row — the directory input defaults to your cwd — then pick the account for it. Remove one with `d`.
 
 ## Replacing `claude`
 

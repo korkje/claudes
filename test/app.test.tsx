@@ -122,14 +122,14 @@ describe("delete", () => {
 });
 
 describe("base paths", () => {
-    it("adds a mapping for the cwd via the paths screen", async () => {
+    it("adds a mapping for the cwd via the + add path row", async () => {
         mkdirSync(join(homedir(), ".claude"));
         const { stdin, lastFrame, unmount } = renderApp();
         await delay();
         stdin.write("p");
         await delay();
-        expect(lastFrame()).toContain("(none configured)");
-        stdin.write("a");
+        expect(lastFrame()).toContain("+ add path"); // only row when empty
+        stdin.write("\r");
         await delay();
         expect(lastFrame()).toContain(process.cwd());
         stdin.write("\r"); // accept prefilled cwd
@@ -138,6 +138,24 @@ describe("base paths", () => {
         stdin.write("\r"); // assign to the first account (default)
         await delay();
         expect(loadConfig().basePaths).toEqual({ [process.cwd()]: "~/.claude" });
+        unmount();
+    });
+
+    it("deletes the selected mapping with d", async () => {
+        mkdirSync(join(homedir(), ".claude"));
+        writeFileSync(
+            join(homedir(), ".claudes.json"),
+            JSON.stringify({ basePaths: { "~/dev": "~/.claude" } }),
+        );
+        const { stdin, lastFrame, unmount } = renderApp();
+        await delay();
+        stdin.write("p");
+        await delay();
+        expect(lastFrame()).toContain("~/dev");
+        stdin.write("d");
+        await delay();
+        expect(lastFrame()).not.toContain("~/dev");
+        expect(loadConfig().basePaths).toEqual({});
         unmount();
     });
 });

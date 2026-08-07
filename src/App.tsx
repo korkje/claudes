@@ -263,26 +263,28 @@ export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpda
 
     if (screen.id === "paths") {
         const entries = Object.entries(config.basePaths ?? {}).sort();
+        const pathItems: ReactNode[] = entries.map(([base, name]) => (
+            <Text key={base}>{base} <Text dimColor>→</Text> {accountLabel(name)}</Text>
+        ));
+        pathItems.push(<Text dimColor key="__add">+ add path</Text>);
         return (
             <Menu
                 title="Base paths (directory → account)"
-                items={entries.length > 0
-                    ? entries.map(([base, name]) => <Text key={base}>{base} <Text dimColor>→</Text> {accountLabel(name)}</Text>)
-                    : [<Text dimColor key="empty">(none configured)</Text>]}
+                items={pathItems}
                 index={pathsIndex}
                 onIndexChange={setPathsIndex}
                 notice={notice}
-                footer="a add · d delete · esc back"
+                footer="↵ add · d delete · esc back"
                 onAction={({ input, key, index }) => {
                     setNotice(null);
-                    if (input === "a") {
+                    if (key.return && index === entries.length) {
                         setScreen({ id: "pathAdd" });
                     } else if (input === "d" && entries[index]) {
                         const [base] = entries[index];
                         const basePaths = { ...config.basePaths };
                         delete basePaths[base];
                         updateConfig({ ...config, basePaths });
-                        setPathsIndex(i => Math.max(0, Math.min(i, entries.length - 2)));
+                        setPathsIndex(i => Math.max(0, Math.min(i, entries.length - 1)));
                     } else if (key.escape || input === "q") {
                         setScreen({ id: "list" });
                     }

@@ -1,16 +1,16 @@
-import { readFileSync } from "node:fs";
 import { render } from "ink";
 import { accountExists, DEFAULT_ACCOUNT, matchBasePath } from "./accounts.js";
 import { App } from "./App.js";
 import { loadConfig } from "./config.js";
 import { launchClaude } from "./launch.js";
+import { currentVersion } from "./version.js";
 
 const HELP = `claudes — multi-account launcher for Claude Code
 
 Usage:
   claudes              interactive UI
-  claudes -- <args>    skip the UI: resolve the account automatically and
-                       launch claude with <args> passed through untouched
+  claudes -- <args>    interactive UI, launching claude with <args> passed
+                       through untouched
 
 The interactive UI picks, creates, and manages accounts, then launches
 claude with CLAUDE_CONFIG_DIR pointing at the selected one:
@@ -21,11 +21,12 @@ claude with CLAUDE_CONFIG_DIR pointing at the selected one:
   p            manage base paths (directory → account auto-selection)
   q / esc      quit
 
-Automatic resolution (also used when stdin is not a TTY) picks the base
-path match for the working directory, or else the default.
+When stdin is not a TTY (pipes, scripts) the UI is skipped and the account
+resolves automatically: the base path match for the working directory, or
+else the default.
 
-Tip: pressing a in the UI aliases claude to "claudes --", so bare claude
-opens the UI and claude <args> launches directly.
+Tip: pressing a in the UI aliases claude to "claudes --", so plain claude
+always goes through the account selector.
 
 Config: ~/.claudes.json · accounts: ~/.claude-<name> · "default (~/.claude)"
 is your regular Claude Code config`;
@@ -55,13 +56,13 @@ async function main(): Promise<void> {
             return;
         }
         if (arg === "-v" || arg === "--version") {
-            console.log(JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version);
+            console.log(currentVersion());
             return;
         }
         fail(`unexpected argument "${arg}" — claudes is interactive, see: claudes --help`);
     }
 
-    if (!process.stdin.isTTY || claudeArgs.length > 0) {
+    if (!process.stdin.isTTY) {
         launchClaude(resolveAccount(), claudeArgs);
         return;
     }

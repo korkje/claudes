@@ -14,9 +14,9 @@ beforeEach(() => {
     }
 });
 
-function renderApp(props: { countdownSeconds?: number } = {}) {
+function renderApp(props: { countdownSeconds?: number; checkUpdate?: () => Promise<string | null> } = {}) {
     const onLaunch = vi.fn();
-    const app = render(<App onLaunch={onLaunch} {...props} />);
+    const app = render(<App onLaunch={onLaunch} checkUpdate={async () => null} {...props} />);
     return { ...app, onLaunch };
 }
 
@@ -163,7 +163,7 @@ describe("countdown", () => {
         mapCwd("work");
         const { lastFrame, unmount } = renderApp({ countdownSeconds: 5 });
         await delay();
-        expect(lastFrame()).toMatch(/work launching in 5s…/);
+        expect(lastFrame()).toMatch(/work \(5\) launching…/);
         expect(lastFrame()).not.toContain("(path match)");
         unmount();
     });
@@ -172,10 +172,10 @@ describe("countdown", () => {
         mapCwd("work");
         const { stdin, lastFrame, onLaunch, unmount } = renderApp({ countdownSeconds: 5 });
         await delay();
-        expect(lastFrame()).toContain("launching in");
+        expect(lastFrame()).toContain("launching…");
         stdin.write("j");
         await delay();
-        expect(lastFrame()).not.toContain("launching in");
+        expect(lastFrame()).not.toContain("launching…");
         expect(lastFrame()).toContain("(path match)");
         expect(onLaunch).not.toHaveBeenCalled();
         unmount();
@@ -187,7 +187,7 @@ describe("countdown", () => {
         await delay();
         stdin.write("x");
         await delay();
-        expect(lastFrame()).toContain("launching in");
+        expect(lastFrame()).toContain("launching…");
         expect(onLaunch).not.toHaveBeenCalled();
         unmount();
     });
@@ -196,7 +196,27 @@ describe("countdown", () => {
         mkdirSync(join(homedir(), ".claude"));
         const { lastFrame, unmount } = renderApp({ countdownSeconds: 5 });
         await delay();
-        expect(lastFrame()).not.toContain("launching in");
+        expect(lastFrame()).not.toContain("launching…");
+        unmount();
+    });
+});
+
+describe("update check", () => {
+    it("shows a notice when a newer version is available", async () => {
+        mkdirSync(join(homedir(), ".claude"));
+        const { lastFrame, unmount } = renderApp({ checkUpdate: async () => "99.0.0" });
+        await delay();
+        expect(lastFrame()).toContain("update available:");
+        expect(lastFrame()).toContain("99.0.0");
+        expect(lastFrame()).toContain("npm i -g @korkje/claudes");
+        unmount();
+    });
+
+    it("shows nothing when up to date", async () => {
+        mkdirSync(join(homedir(), ".claude"));
+        const { lastFrame, unmount } = renderApp();
+        await delay();
+        expect(lastFrame()).not.toContain("update available:");
         unmount();
     });
 });

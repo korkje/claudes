@@ -15,6 +15,7 @@ import {
 } from "./accounts.js";
 import { contractTilde, expandTilde, loadConfig, saveConfig, type Config } from "./config.js";
 import { currentShell, disableAlias, enableAlias, isAliasEnabled, shellTargets } from "./shells.js";
+import { checkForUpdate, currentVersion } from "./version.js";
 
 type Screen =
     | { id: "list" }
@@ -155,9 +156,10 @@ function ConfirmScreen({ message, onResult }: {
     );
 }
 
-export function App({ onLaunch, countdownSeconds = 3 }: {
+export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpdate }: {
     onLaunch: (name: string) => void;
     countdownSeconds?: number;
+    checkUpdate?: () => Promise<string | null>;
 }) {
     const { exit } = useApp();
     const [config, setConfig] = useState<Config>(() => loadConfig());
@@ -194,6 +196,15 @@ export function App({ onLaunch, countdownSeconds = 3 }: {
         const timer = setTimeout(() => setCountdown(c => (c === null ? null : c - 1)), 1000);
         return () => clearTimeout(timer);
     }, [countdown]);
+
+    const [latestVersion, setLatestVersion] = useState<string | null>(null);
+    useEffect(() => {
+        let mounted = true;
+        checkUpdate().then(version => {
+            if (mounted && version) setLatestVersion(version);
+        });
+        return () => { mounted = false; };
+    }, []);
 
     const updateConfig = (next: Config) => {
         saveConfig(next);
@@ -377,7 +388,7 @@ export function App({ onLaunch, countdownSeconds = 3 }: {
     const items: ReactNode[] = accounts.map(name => {
         let tag: string | null = null;
         if (name === matched) {
-            tag = countdown !== null ? `launching in ${countdown}s…` : "(path match)";
+            tag = countdown !== null ? `(${countdown}) launching…` : "(path match)";
         }
         return (
             <Text key={name}>
@@ -394,44 +405,51 @@ export function App({ onLaunch, countdownSeconds = 3 }: {
     );
 
     return (
-        <Menu
-            title="Select account"
-            items={items}
-            index={listIndex}
-            onIndexChange={index => {
-                setCountdown(null);
-                setListIndex(index);
-            }}
-            notice={notice}
-            footer={`↵ launch · d delete · p paths${hideAliasHint ? "" : " · a alias"} · q quit`}
-            onAction={({ input, key, index }) => {
-                setNotice(null);
-                if (key.return || key.escape || ["d", "p", "a", "q"].includes(input)) {
+        <Box flexDirection="column">
+            <Menu
+                title="Select account"
+                items={items}
+                index={listIndex}
+                onIndexChange={index => {
                     setCountdown(null);
-                }
-                const onCreateRow = index === accounts.length;
-                const name = accounts[index];
-                if (key.return) {
-                    if (onCreateRow) {
-                        setScreen({ id: "create" });
-                    } else if (name) {
-                        onLaunch(name);
+                    setListIndex(index);
+                }}
+                notice={notice}
+                footer={`↵ launch · d delete · p paths${hideAliasHint ? "" : " · a alias"} · q quit`}
+                onAction={({ input, key, index }) => {
+                    setNotice(null);
+                    if (key.return || key.escape || ["d", "p", "a", "q"].includes(input)) {
+                        setCountdown(null);
+                    }
+                    const onCreateRow = index === accounts.length;
+                    const name = accounts[index];
+                    if (key.return) {
+                        if (onCreateRow) {
+                            setScreen({ id: "create" });
+                        } else if (name) {
+                            onLaunch(name);
+                            exit();
+                        }
+                    } else if (input === "d" && name && !onCreateRow) {
+                        if (name === DEFAULT_ACCOUNT) {
+                            setNotice("The default account (~/.claude) cannot be deleted");
+                        } else {
+                            setScreen({ id: "confirmDelete", name });
+                        }
+                    } else if (input === "p") {
+                        setScreen({ id: "paths" });
+                    } else if (input === "a") {
+                        setScreen({ id: "alias" });
+                    } else if (input === "q" || key.escape) {
                         exit();
                     }
-                } else if (input === "d" && name && !onCreateRow) {
-                    if (name === DEFAULT_ACCOUNT) {
-                        setNotice("The default account (~/.claude) cannot be deleted");
-                    } else {
-                        setScreen({ id: "confirmDelete", name });
-                    }
-                } else if (input === "p") {
-                    setScreen({ id: "paths" });
-                } else if (input === "a") {
-                    setScreen({ id: "alias" });
-                } else if (input === "q" || key.escape) {
-                    exit();
-                }
-            }}
-        />
+                }}
+            />
+            {latestVersion ? (
+                <Text color="yellow">
+                    update available: {currentVersion()} → {latestVersion} · npm i -g @korkje/claudes
+                </Text>
+            ) : null}
+        </Box>
     );
 }

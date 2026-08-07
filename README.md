@@ -1,5 +1,7 @@
 # @korkje/claudes
 
+[![npm](https://img.shields.io/npm/v/%40korkje%2Fclaudes)](https://www.npmjs.com/package/@korkje/claudes)
+
 Multi-account launcher for [Claude Code](https://claude.com/claude-code). Keeps any number of independent Claude Code configurations (accounts, settings, history) in `~/.claude-<name>` folders and launches `claude` with `CLAUDE_CONFIG_DIR` pointing at the one you pick.
 
 ## Install

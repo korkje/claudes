@@ -67,7 +67,9 @@ async function main(): Promise<void> {
     }
 
     let selected: string | null = null;
-    const { waitUntilExit } = render(<App onLaunch={name => { selected = name; }} />);
+    const { waitUntilExit } = render(
+        <App onLaunch={name => { selected = name; }} viaAlias={splitAt !== -1} />,
+    );
     await waitUntilExit();
     if (selected !== null) {
         launchClaude(selected, claudeArgs);

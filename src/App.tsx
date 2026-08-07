@@ -21,10 +21,31 @@ type Screen =
     | { id: "list" }
     | { id: "create" }
     | { id: "confirmDelete"; name: string }
-    | { id: "paths" }
-    | { id: "pathAdd" }
-    | { id: "pathAccount"; base: string }
+    | { id: "pathAdd"; account: string }
     | { id: "alias" };
+
+// the account list is a flat list of rows: accounts, and for expanded
+// accounts their base paths plus an "+ add path" row, indented below
+type Row =
+    | { type: "account"; name: string }
+    | { type: "path"; base: string; account: string }
+    | { type: "addPath"; account: string }
+    | { type: "newAccount" };
+
+function buildRows(accounts: string[], basePaths: Record<string, string>, expanded: Set<string>): Row[] {
+    const rows: Row[] = [];
+    for (const name of accounts) {
+        rows.push({ type: "account", name });
+        if (expanded.has(name)) {
+            for (const [base, account] of Object.entries(basePaths).sort()) {
+                if (account === name) rows.push({ type: "path", base, account });
+            }
+            rows.push({ type: "addPath", account: name });
+        }
+    }
+    rows.push({ type: "newAccount" });
+    return rows;
+}
 
 interface MenuAction {
     input: string;
@@ -166,8 +187,7 @@ export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpda
     const [accounts, setAccounts] = useState<string[]>(() => listAccounts());
     const [screen, setScreen] = useState<Screen>({ id: "list" });
     const [notice, setNotice] = useState<string | null>(null);
-    const [pathsIndex, setPathsIndex] = useState(0);
-    const [accountPickIndex, setAccountPickIndex] = useState(0);
+    const [expanded, setExpanded] = useState<Set<string>>(new Set());
     const [aliasIndex, setAliasIndex] = useState(() => {
         const shell = currentShell();
         const preselect = shellTargets().findIndex(t => t.id === shell);
@@ -228,7 +248,8 @@ export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpda
                     createAccount(name);
                     const next = listAccounts();
                     setAccounts(next);
-                    setListIndex(Math.max(0, next.indexOf(name)));
+                    setListIndex(Math.max(0, buildRows(next, config.basePaths ?? {}, expanded)
+                        .findIndex(r => r.type === "account" && r.name === name)));
                     setNotice(`Created ${contractTilde(accountDir(name))}`);
                     setScreen({ id: "list" });
                 }}
@@ -252,7 +273,11 @@ export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpda
                         updateConfig(nextConfig);
                         const next = listAccounts();
                         setAccounts(next);
-                        setListIndex(i => Math.min(i, next.length - 1));
+                        const nextExpanded = new Set(expanded);
+                        nextExpanded.delete(name);
+                        setExpanded(nextExpanded);
+                        const rowCount = buildRows(next, nextConfig.basePaths, nextExpanded).length;
+                        setListIndex(i => Math.max(0, Math.min(i, rowCount - 1)));
                         setNotice(`Removed ${contractTilde(accountDir(name))}`);
                     }
                     setScreen({ id: "list" });
@@ -261,45 +286,14 @@ export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpda
         );
     }
 
-    if (screen.id === "paths") {
-        const entries = Object.entries(config.basePaths ?? {}).sort();
-        const pathItems: ReactNode[] = entries.map(([base, name]) => (
-            <Text key={base}>{base} <Text dimColor>→</Text> {accountLabel(name)}</Text>
-        ));
-        pathItems.push(<Text dimColor key="__add">+ add path</Text>);
-        return (
-            <Menu
-                title="Base paths (directory → account)"
-                items={pathItems}
-                index={pathsIndex}
-                onIndexChange={setPathsIndex}
-                notice={notice}
-                footer="d delete · esc back"
-                onAction={({ input, key, index }) => {
-                    setNotice(null);
-                    if (key.return && index === entries.length) {
-                        setScreen({ id: "pathAdd" });
-                    } else if (input === "d" && entries[index]) {
-                        const [base] = entries[index];
-                        const basePaths = { ...config.basePaths };
-                        delete basePaths[base];
-                        updateConfig({ ...config, basePaths });
-                        setPathsIndex(i => Math.max(0, Math.min(i, entries.length - 1)));
-                    } else if (key.escape) {
-                        setScreen({ id: "list" });
-                    }
-                }}
-            />
-        );
-    }
-
     if (screen.id === "pathAdd") {
+        const { account } = screen;
         return (
             <InputScreen
-                title="Add base path"
+                title={`Add base path for ${accountLabel(account)}`}
                 label="Directory: "
                 initial={contractTilde(cwd)}
-                hint="↵ next · esc back"
+                hint="↵ add · esc back"
                 validate={value => {
                     if (!value) return "Enter a directory";
                     const abs = resolve(expandTilde(value));
@@ -310,10 +304,14 @@ export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpda
                 }}
                 onSubmit={value => {
                     const base = contractTilde(resolve(expandTilde(value)));
-                    setAccountPickIndex(0);
-                    setScreen({ id: "pathAccount", base });
+                    updateConfig({
+                        ...config,
+                        basePaths: { ...config.basePaths, [base]: account },
+                    });
+                    setNotice(`${base} → ${accountLabel(account)}`);
+                    setScreen({ id: "list" });
                 }}
-                onCancel={() => setScreen({ id: "paths" })}
+                onCancel={() => setScreen({ id: "list" })}
             />
         );
     }
@@ -361,50 +359,46 @@ export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpda
         );
     }
 
-    if (screen.id === "pathAccount") {
-        const { base } = screen;
-        return (
-            <Menu
-                title={`Account for ${base}`}
-                items={accounts.map(name => <Text key={name}>{accountLabel(name)}</Text>)}
-                index={accountPickIndex}
-                onIndexChange={setAccountPickIndex}
-                footer="↵ assign · esc back"
-                onAction={({ input, key, index }) => {
-                    if (key.return && accounts[index]) {
-                        updateConfig({
-                            ...config,
-                            basePaths: { ...config.basePaths, [base]: accounts[index] },
-                        });
-                        setNotice(`${base} → ${accountLabel(accounts[index])}`);
-                        setScreen({ id: "paths" });
-                    } else if (key.escape) {
-                        setScreen({ id: "paths" });
-                    }
-                }}
-            />
-        );
-    }
-
     // main list
-    const items: ReactNode[] = accounts.map(name => {
-        let tag: string | null = null;
-        if (name === matched) {
-            tag = countdown !== null ? `(${countdown}) launching…` : "(path match)";
+    const basePaths = config.basePaths ?? {};
+    const rows = buildRows(accounts, basePaths, expanded);
+    const items: ReactNode[] = rows.map(row => {
+        if (row.type === "account") {
+            let tag: string | null = null;
+            if (row.name === matched) {
+                tag = countdown !== null ? `(${countdown}) launching…` : "(path match)";
+            }
+            return (
+                <Text key={`account:${row.name}`}>
+                    {accountLabel(row.name)}
+                    {tag ? <Text dimColor> {tag}</Text> : null}
+                </Text>
+            );
         }
-        return (
-            <Text key={name}>
-                {accountLabel(name)}
-                {tag ? <Text dimColor> {tag}</Text> : null}
-            </Text>
-        );
+        if (row.type === "path") {
+            return <Text key={`path:${row.base}`}>{"  "}{row.base}</Text>;
+        }
+        if (row.type === "addPath") {
+            return <Text key={`addPath:${row.account}`} dimColor>{"  "}+ add path</Text>;
+        }
+        return <Text key="newAccount" dimColor>+ new account</Text>;
     });
-    items.push(<Text dimColor key="__new">+ new account</Text>);
 
     // no need to advertise the alias once it's enabled for the user's shell
     const hideAliasHint = shellTargets().some(
         target => target.id === currentShell() && isAliasEnabled(target),
     );
+
+    const setPathsOpen = (account: string, open: boolean) => {
+        if (expanded.has(account) === open) return;
+        const next = new Set(expanded);
+        if (open) next.add(account);
+        else next.delete(account);
+        setExpanded(next);
+        // keep the cursor on the toggled account's own row
+        setListIndex(Math.max(0, buildRows(accounts, basePaths, next)
+            .findIndex(r => r.type === "account" && r.name === account)));
+    };
 
     return (
         <Box flexDirection="column">
@@ -420,26 +414,41 @@ export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpda
                 footer={`↵ launch · d delete · p paths${hideAliasHint ? "" : " · a alias"} · esc quit`}
                 onAction={({ input, key, index }) => {
                     setNotice(null);
-                    if (key.return || key.escape || ["d", "p", "a"].includes(input)) {
+                    if (key.return || key.escape || key.leftArrow || key.rightArrow
+                        || ["d", "p", "a"].includes(input)) {
                         setCountdown(null);
                     }
-                    const onCreateRow = index === accounts.length;
-                    const name = accounts[index];
+                    const row = rows[index];
+                    if (!row) return;
                     if (key.return) {
-                        if (onCreateRow) {
-                            setScreen({ id: "create" });
-                        } else if (name) {
-                            onLaunch(name);
+                        if (row.type === "account") {
+                            onLaunch(row.name);
                             exit();
+                        } else if (row.type === "addPath") {
+                            setScreen({ id: "pathAdd", account: row.account });
+                        } else if (row.type === "newAccount") {
+                            setScreen({ id: "create" });
                         }
-                    } else if (input === "d" && name && !onCreateRow) {
-                        if (name === DEFAULT_ACCOUNT) {
-                            setNotice("The default account (~/.claude) cannot be deleted");
-                        } else {
-                            setScreen({ id: "confirmDelete", name });
+                    } else if (input === "p" && row.type !== "newAccount") {
+                        const account = row.type === "account" ? row.name : row.account;
+                        setPathsOpen(account, !expanded.has(account));
+                    } else if ((key.rightArrow || key.leftArrow) && row.type !== "newAccount") {
+                        // undocumented: right opens, left closes
+                        const account = row.type === "account" ? row.name : row.account;
+                        setPathsOpen(account, key.rightArrow);
+                    } else if (input === "d") {
+                        if (row.type === "account") {
+                            if (row.name === DEFAULT_ACCOUNT) {
+                                setNotice("The default account (~/.claude) cannot be deleted");
+                            } else {
+                                setScreen({ id: "confirmDelete", name: row.name });
+                            }
+                        } else if (row.type === "path") {
+                            const nextPaths = { ...basePaths };
+                            delete nextPaths[row.base];
+                            updateConfig({ ...config, basePaths: nextPaths });
+                            setListIndex(i => Math.max(0, Math.min(i, rows.length - 2)));
                         }
-                    } else if (input === "p") {
-                        setScreen({ id: "paths" });
                     } else if (input === "a") {
                         setScreen({ id: "alias" });
                     } else if (key.escape) {

@@ -1,0 +1,55 @@
+{
+  "name": "@korkje/claudes",
+  "version": "0.1.0",
+  "description": "Multi-account launcher for Claude Code — manage and switch between CLAUDE_CONFIG_DIR profiles",
+  "keywords": [
+    "claude",
+    "claude-code",
+    "cli",
+    "accounts",
+    "config"
+  ],
+  "license": "MIT",
+  "author": "Ola Næss Kaldestad <mail@okal.no>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/korkje/claudes.git"
+  },
+  "homepage": "https://github.com/korkje/claudes#readme",
+  "bugs": {
+    "url": "https://github.com/korkje/claudes/issues"
+  },
+  "type": "module",
+  "bin": {
+    "claudes": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "pretest": "npm run build",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "ink": "^6.0.1",
+    "react": "^19.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.1.0",
+    "ink-testing-library": "^4.0.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.8.0",
+    "vitest": "^4.1.10"
+  }
+}

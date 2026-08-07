@@ -1,0 +1,139 @@
+import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { beforeEach, describe, expect, it } from "vitest";
+import {
+    accountDir,
+    accountLabel,
+    createAccount,
+    DEFAULT_ACCOUNT,
+    listAccounts,
+    matchBasePath,
+    removeAccount,
+    validateName,
+} from "../src/accounts.js";
+import { contractTilde, expandTilde, loadConfig, saveConfig } from "../src/config.js";
+
+export function resetHome(): void {
+    for (const entry of readdirSync(homedir())) {
+        rmSync(join(homedir(), entry), { recursive: true, force: true });
+    }
+}
+
+beforeEach(resetHome);
+
+describe("listAccounts", () => {
+    it("is empty when nothing exists", () => {
+        expect(listAccounts()).toEqual([]);
+    });
+
+    it("puts default first when ~/.claude exists, named accounts sorted after", () => {
+        mkdirSync(join(homedir(), ".claude"));
+        mkdirSync(join(homedir(), ".claude-work"));
+        mkdirSync(join(homedir(), ".claude-alpha"));
+        expect(listAccounts()).toEqual([DEFAULT_ACCOUNT, "alpha", "work"]);
+    });
+
+    it("omits default when ~/.claude does not exist", () => {
+        mkdirSync(join(homedir(), ".claude-work"));
+        expect(listAccounts()).toEqual(["work"]);
+    });
+
+    it("lists a manually created ~/.claude-default as a normal account", () => {
+        mkdirSync(join(homedir(), ".claude"));
+        mkdirSync(join(homedir(), ".claude-default"));
+        expect(listAccounts()).toEqual([DEFAULT_ACCOUNT, "default"]);
+        expect(accountDir("default")).toBe(join(homedir(), ".claude-default"));
+        expect(accountDir(DEFAULT_ACCOUNT)).toBe(join(homedir(), ".claude"));
+    });
+});
+
+describe("accountLabel", () => {
+    it("labels the default account with its path", () => {
+        expect(accountLabel(DEFAULT_ACCOUNT)).toBe("default (~/.claude)");
+        expect(accountLabel("work")).toBe("work");
+    });
+});
+
+describe("validateName", () => {
+    it("accepts simple names, including 'default'", () => {
+        expect(validateName("work")).toBeNull();
+        expect(validateName("default")).toBeNull();
+        expect(validateName("a-b_c2")).toBeNull();
+    });
+
+    it("rejects names claudes could not have created", () => {
+        expect(validateName("bad name")).not.toBeNull();
+        expect(validateName("-lead")).not.toBeNull();
+        expect(validateName("")).not.toBeNull();
+        expect(validateName("x/y")).not.toBeNull();
+    });
+});
+
+describe("create/removeAccount", () => {
+    it("creates and removes account folders", () => {
+        createAccount("work");
+        expect(existsSync(join(homedir(), ".claude-work"))).toBe(true);
+        removeAccount("work");
+        expect(existsSync(join(homedir(), ".claude-work"))).toBe(false);
+    });
+
+    it("refuses to remove the default account", () => {
+        mkdirSync(join(homedir(), ".claude"));
+        expect(() => removeAccount(DEFAULT_ACCOUNT)).toThrow();
+        expect(existsSync(join(homedir(), ".claude"))).toBe(true);
+    });
+});
+
+describe("matchBasePath", () => {
+    const config = {
+        basePaths: {
+            "~/dev": "dev",
+            "~/dev/personal": "personal",
+        },
+    };
+
+    it("matches the longest base path", () => {
+        expect(matchBasePath(config, join(homedir(), "dev", "other"))).toBe("dev");
+        expect(matchBasePath(config, join(homedir(), "dev", "personal", "x"))).toBe("personal");
+    });
+
+    it("matches the base directory itself", () => {
+        expect(matchBasePath(config, join(homedir(), "dev"))).toBe("dev");
+    });
+
+    it("only matches on path boundaries", () => {
+        expect(matchBasePath(config, join(homedir(), "devious"))).toBeUndefined();
+    });
+
+    it("returns undefined without mappings", () => {
+        expect(matchBasePath({}, homedir())).toBeUndefined();
+    });
+});
+
+describe("config", () => {
+    it("round-trips basePaths", () => {
+        saveConfig({ basePaths: { "~/x": "work" } });
+        expect(loadConfig()).toEqual({ basePaths: { "~/x": "work" } });
+    });
+
+    it("drops unknown keys from older versions", () => {
+        writeFileSync(
+            join(homedir(), ".claudes.json"),
+            JSON.stringify({ current: "work", basePaths: { "~/x": "work" } }),
+        );
+        expect(loadConfig()).toEqual({ basePaths: { "~/x": "work" } });
+    });
+
+    it("returns an empty config for missing or corrupt files", () => {
+        expect(loadConfig()).toEqual({});
+        writeFileSync(join(homedir(), ".claudes.json"), "not json");
+        expect(loadConfig()).toEqual({});
+    });
+
+    it("expands and contracts tildes", () => {
+        expect(expandTilde("~/a/b")).toBe(join(homedir(), "a", "b"));
+        expect(contractTilde(join(homedir(), "a"))).toBe("~/a");
+        expect(contractTilde("/other/a")).toBe("/other/a");
+    });
+});

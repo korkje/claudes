@@ -158,7 +158,7 @@ function ConfirmScreen({ message, onResult }: {
 export function App({ onLaunch, countdownSeconds = 3, viaAlias = false }: {
     onLaunch: (name: string) => void;
     countdownSeconds?: number;
-    // launched through the claude alias -> no need to advertise "a alias"
+    // invoked with "--", which is how the claude alias calls claudes
     viaAlias?: boolean;
 }) {
     const { exit } = useApp();
@@ -390,6 +390,12 @@ export function App({ onLaunch, countdownSeconds = 3, viaAlias = false }: {
     });
     items.push(<Text dimColor key="__new">+ new account</Text>);
 
+    // hide the alias hint only when this launch came through the alias:
+    // invoked with "--" AND the alias really is enabled for the shell
+    const hideAliasHint = viaAlias && shellTargets().some(
+        target => target.id === currentShell() && isAliasEnabled(target),
+    );
+
     return (
         <Menu
             title="Select account"
@@ -400,7 +406,7 @@ export function App({ onLaunch, countdownSeconds = 3, viaAlias = false }: {
                 setListIndex(index);
             }}
             notice={notice}
-            footer={`↵ launch · d delete · p paths${viaAlias ? "" : " · a alias"} · q quit`}
+            footer={`↵ launch · d delete · p paths${hideAliasHint ? "" : " · a alias"} · q quit`}
             onAction={({ input, key, index }) => {
                 setNotice(null);
                 if (key.return || key.escape || ["d", "p", "a", "q"].includes(input)) {

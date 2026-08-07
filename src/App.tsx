@@ -374,12 +374,18 @@ export function App({ onLaunch, countdownSeconds = 3 }: {
     }
 
     // main list
-    const items: ReactNode[] = accounts.map(name => (
-        <Text key={name}>
-            {accountLabel(name)}
-            {name === matched ? <Text dimColor> (path match)</Text> : null}
-        </Text>
-    ));
+    const items: ReactNode[] = accounts.map(name => {
+        let tag: string | null = null;
+        if (name === matched) {
+            tag = countdown !== null ? `launching in ${countdown}s…` : "(path match)";
+        }
+        return (
+            <Text key={name}>
+                {accountLabel(name)}
+                {tag ? <Text dimColor> {tag}</Text> : null}
+            </Text>
+        );
+    });
     items.push(<Text dimColor key="__new">+ new account</Text>);
 
     const aliasEnabled = shellTargets().some(
@@ -395,9 +401,7 @@ export function App({ onLaunch, countdownSeconds = 3 }: {
                 setCountdown(null);
                 setListIndex(index);
             }}
-            notice={countdown !== null
-                ? `Launching "${accountLabel(matched!)}" in ${countdown}s — ↑/↓ cancels`
-                : notice}
+            notice={notice}
             footer={`↵ launch · d delete · p paths${aliasEnabled ? "" : " · a alias"} · q quit`}
             onAction={({ input, key, index }) => {
                 setNotice(null);

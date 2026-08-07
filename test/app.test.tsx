@@ -159,14 +159,24 @@ describe("countdown", () => {
         unmount();
     });
 
-    it("is cancelled by navigation", async () => {
+    it("shows the countdown on the matched account's row", async () => {
+        mapCwd("work");
+        const { lastFrame, unmount } = renderApp({ countdownSeconds: 5 });
+        await delay();
+        expect(lastFrame()).toMatch(/work launching in 5s…/);
+        expect(lastFrame()).not.toContain("(path match)");
+        unmount();
+    });
+
+    it("is cancelled by navigation, restoring the path match tag", async () => {
         mapCwd("work");
         const { stdin, lastFrame, onLaunch, unmount } = renderApp({ countdownSeconds: 5 });
         await delay();
-        expect(lastFrame()).toContain("Launching");
+        expect(lastFrame()).toContain("launching in");
         stdin.write("j");
         await delay();
-        expect(lastFrame()).not.toContain("Launching");
+        expect(lastFrame()).not.toContain("launching in");
+        expect(lastFrame()).toContain("(path match)");
         expect(onLaunch).not.toHaveBeenCalled();
         unmount();
     });
@@ -177,7 +187,7 @@ describe("countdown", () => {
         await delay();
         stdin.write("x");
         await delay();
-        expect(lastFrame()).toContain("Launching");
+        expect(lastFrame()).toContain("launching in");
         expect(onLaunch).not.toHaveBeenCalled();
         unmount();
     });
@@ -186,7 +196,7 @@ describe("countdown", () => {
         mkdirSync(join(homedir(), ".claude"));
         const { lastFrame, unmount } = renderApp({ countdownSeconds: 5 });
         await delay();
-        expect(lastFrame()).not.toContain("Launching");
+        expect(lastFrame()).not.toContain("launching in");
         unmount();
     });
 });

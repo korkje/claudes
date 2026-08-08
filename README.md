@@ -26,7 +26,7 @@ Everything is managed from the interactive UI:
 | Key | Action |
 | --- | --- |
 | `↑`/`↓` or `j`/`k` | move |
-| `enter` | launch the selected account, or create one via the `+ new account` row |
+| `enter` | launch the selected account; on `+ new account` / `+ add path` rows it opens an inline input (`enter` applies, `esc` cancels) |
 | `d` | delete account (asks for confirmation), or a base path mapping |
 | `p` | show/hide the account's base paths |
 | `esc` | back — quits from the account list |
@@ -39,7 +39,7 @@ On startup the UI checks npm for a newer claudes release in the background and s
 
 Base paths map directories to accounts: starting `claudes` inside a mapped directory preselects that account (longest match wins) and auto-launches it after a short countdown — navigating or using a shortcut cancels (unbound keys are ignored).
 
-They're managed inline: press `p` on an account to expand its paths as an indented list below it (press again to collapse). `d` on a path removes the mapping, and the indented `+ add path` row maps a new directory to that account — the input defaults to your cwd.
+They're managed inline: press `p` on an account to expand its paths as an indented list below it (press again to collapse). `d` on a path removes the mapping, and the indented `+ add path` row turns into an input right in the list (prefilled with your cwd) that maps a new directory to that account.
 
 ## Replacing `claude`
 

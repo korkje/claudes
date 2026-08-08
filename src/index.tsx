@@ -16,7 +16,8 @@ The interactive UI picks, creates, and manages accounts, then launches
 claude with CLAUDE_CONFIG_DIR pointing at the selected one:
 
   ↑/↓ or j/k   move
-  enter        launch the selected account (or create one via "+ new account")
+  enter        launch the selected account; on a "+ new account" or
+               "+ add path" row it opens an inline input (↵ apply, esc cancel)
   d            delete account (asks for confirmation)
   p            show/hide the account's base paths (directory → account
                auto-selection): d removes one, "+ add path" adds one

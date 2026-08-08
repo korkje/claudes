@@ -36,7 +36,8 @@ Sleep 400ms
 Enter
 Sleep 1.2s
 
-# map a directory to each account (p expands, "+ add path" adds inline)
+# map a directory to the personal account (p expands, ↵ turns the
+# "+ add path" row into an inline input)
 Up
 Sleep 500ms
 Type "p"
@@ -48,22 +49,7 @@ Sleep 1s
 Type "/dev/personal"
 Sleep 400ms
 Enter
-Sleep 1.5s
-Down
-Sleep 400ms
-Down
-Sleep 400ms
-Type "p"
-Sleep 1s
-Down
-Sleep 500ms
-Enter
-Sleep 1s
-Type "/dev/work"
-Sleep 400ms
-Enter
-Sleep 1.5s
-Sleep 1s
+Sleep 2s
 Escape
 Sleep 1s
 

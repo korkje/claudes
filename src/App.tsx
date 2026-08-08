@@ -19,10 +19,14 @@ import { checkForUpdate, currentVersion } from "./version.js";
 
 type Screen =
     | { id: "list" }
-    | { id: "create" }
     | { id: "confirmDelete"; name: string }
-    | { id: "pathAdd"; account: string }
     | { id: "alias" };
+
+// inline editor state: the "+ new account" / "+ add path" row the cursor
+// is on turns into a text input
+type Editing =
+    | { type: "account" }
+    | { type: "path"; account: string };
 
 // the account list is a flat list of rows: accounts, and for expanded
 // accounts their base paths plus an "+ add path" row, indented below
@@ -53,7 +57,7 @@ interface MenuAction {
     index: number;
 }
 
-function Menu({ title, items, index, onIndexChange, footer, notice, onAction }: {
+function Menu({ title, items, index, onIndexChange, footer, notice, onAction, isActive = true }: {
     title: string;
     items: ReactNode[];
     index: number;
@@ -61,6 +65,8 @@ function Menu({ title, items, index, onIndexChange, footer, notice, onAction }: 
     footer: string;
     notice?: string | null;
     onAction: (action: MenuAction) => void;
+    // false while an inline editor owns the keyboard
+    isActive?: boolean;
 }) {
     useInput((input, key) => {
         const count = items.length;
@@ -71,7 +77,7 @@ function Menu({ title, items, index, onIndexChange, footer, notice, onAction }: 
         } else {
             onAction({ input, key, index });
         }
-    });
+    }, { isActive });
 
     return (
         <Box flexDirection="column">
@@ -129,38 +135,6 @@ function TextInput({ initial = "", onChange, onSubmit, onCancel }: {
     );
 }
 
-function InputScreen({ title, label, initial, hint, validate, onSubmit, onCancel }: {
-    title: string;
-    label: string;
-    initial?: string;
-    hint: string;
-    validate: (value: string) => string | null;
-    onSubmit: (value: string) => void;
-    onCancel: () => void;
-}) {
-    const [error, setError] = useState<string | null>(null);
-    return (
-        <Box flexDirection="column">
-            <Text bold>{title}</Text>
-            <Text>
-                {label}
-                <TextInput
-                    initial={initial}
-                    onChange={() => setError(null)}
-                    onSubmit={value => {
-                        const problem = validate(value);
-                        if (problem) setError(problem);
-                        else onSubmit(value);
-                    }}
-                    onCancel={onCancel}
-                />
-            </Text>
-            {error ? <Text color="red">{error}</Text> : null}
-            <Text dimColor>{hint}</Text>
-        </Box>
-    );
-}
-
 function ConfirmScreen({ message, onResult }: {
     message: string;
     onResult: (confirmed: boolean) => void;
@@ -188,6 +162,8 @@ export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpda
     const [screen, setScreen] = useState<Screen>({ id: "list" });
     const [notice, setNotice] = useState<string | null>(null);
     const [expanded, setExpanded] = useState<Set<string>>(new Set());
+    const [editing, setEditing] = useState<Editing | null>(null);
+    const [editError, setEditError] = useState<string | null>(null);
     const [aliasIndex, setAliasIndex] = useState(() => {
         const shell = currentShell();
         const preselect = shellTargets().findIndex(t => t.id === shell);
@@ -231,32 +207,36 @@ export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpda
         setConfig(next);
     };
 
-    if (screen.id === "create") {
-        return (
-            <InputScreen
-                title="New account"
-                label="Name: "
-                hint="↵ create · esc back"
-                validate={name => {
-                    if (!name) return "Enter a name";
-                    const error = validateName(name);
-                    if (error) return error;
-                    if (accountExists(name)) return `Account "${name}" already exists`;
-                    return null;
-                }}
-                onSubmit={name => {
-                    createAccount(name);
-                    const next = listAccounts();
-                    setAccounts(next);
-                    setListIndex(Math.max(0, buildRows(next, config.basePaths ?? {}, expanded)
-                        .findIndex(r => r.type === "account" && r.name === name)));
-                    setNotice(`Created ${contractTilde(accountDir(name))}`);
-                    setScreen({ id: "list" });
-                }}
-                onCancel={() => setScreen({ id: "list" })}
-            />
-        );
-    }
+    const cancelEdit = () => {
+        setEditing(null);
+        setEditError(null);
+    };
+
+    const submitNewAccount = (name: string) => {
+        if (!name) return setEditError("Enter a name");
+        const error = validateName(name);
+        if (error) return setEditError(error);
+        if (accountExists(name)) return setEditError(`Account "${name}" already exists`);
+        createAccount(name);
+        const next = listAccounts();
+        setAccounts(next);
+        setListIndex(Math.max(0, buildRows(next, config.basePaths ?? {}, expanded)
+            .findIndex(r => r.type === "account" && r.name === name)));
+        setNotice(`Created ${contractTilde(accountDir(name))}`);
+        cancelEdit();
+    };
+
+    const submitNewPath = (account: string, value: string) => {
+        if (!value) return setEditError("Enter a directory");
+        const abs = resolve(expandTilde(value));
+        if (!existsSync(abs) || !statSync(abs).isDirectory()) {
+            return setEditError(`Not a directory: ${abs}`);
+        }
+        const base = contractTilde(abs);
+        updateConfig({ ...config, basePaths: { ...config.basePaths, [base]: account } });
+        setNotice(`${base} → ${accountLabel(account)}`);
+        cancelEdit();
+    };
 
     if (screen.id === "confirmDelete") {
         const { name } = screen;
@@ -282,36 +262,6 @@ export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpda
                     }
                     setScreen({ id: "list" });
                 }}
-            />
-        );
-    }
-
-    if (screen.id === "pathAdd") {
-        const { account } = screen;
-        return (
-            <InputScreen
-                title={`Add base path for ${accountLabel(account)}`}
-                label="Directory: "
-                initial={contractTilde(cwd)}
-                hint="↵ add · esc back"
-                validate={value => {
-                    if (!value) return "Enter a directory";
-                    const abs = resolve(expandTilde(value));
-                    if (!existsSync(abs) || !statSync(abs).isDirectory()) {
-                        return `Not a directory: ${abs}`;
-                    }
-                    return null;
-                }}
-                onSubmit={value => {
-                    const base = contractTilde(resolve(expandTilde(value)));
-                    updateConfig({
-                        ...config,
-                        basePaths: { ...config.basePaths, [base]: account },
-                    });
-                    setNotice(`${base} → ${accountLabel(account)}`);
-                    setScreen({ id: "list" });
-                }}
-                onCancel={() => setScreen({ id: "list" })}
             />
         );
     }
@@ -379,7 +329,34 @@ export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpda
             return <Text key={`path:${row.base}`}>{"  "}{row.base}</Text>;
         }
         if (row.type === "addPath") {
+            if (editing?.type === "path" && editing.account === row.account) {
+                return (
+                    <Text key={`addPath:${row.account}`}>
+                        {"  "}+{" "}
+                        <TextInput
+                            initial={contractTilde(cwd)}
+                            onChange={() => setEditError(null)}
+                            onSubmit={value => submitNewPath(row.account, value)}
+                            onCancel={cancelEdit}
+                        />
+                        {editError ? <Text color="red">  {editError}</Text> : null}
+                    </Text>
+                );
+            }
             return <Text key={`addPath:${row.account}`} dimColor>{"  "}+ add path</Text>;
+        }
+        if (editing?.type === "account") {
+            return (
+                <Text key="newAccount">
+                    +{" "}
+                    <TextInput
+                        onChange={() => setEditError(null)}
+                        onSubmit={submitNewAccount}
+                        onCancel={cancelEdit}
+                    />
+                    {editError ? <Text color="red">  {editError}</Text> : null}
+                </Text>
+            );
         }
         return <Text key="newAccount" dimColor>+ new account</Text>;
     });
@@ -411,7 +388,10 @@ export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpda
                     setListIndex(index);
                 }}
                 notice={notice}
-                footer={`↵ launch · d delete · p paths${hideAliasHint ? "" : " · a alias"} · esc quit`}
+                footer={editing
+                    ? "↵ apply · esc cancel"
+                    : `↵ launch · d delete · p paths${hideAliasHint ? "" : " · a alias"} · esc quit`}
+                isActive={editing === null}
                 onAction={({ input, key, index }) => {
                     setNotice(null);
                     if (key.return || key.escape || key.leftArrow || key.rightArrow
@@ -425,9 +405,9 @@ export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpda
                             onLaunch(row.name);
                             exit();
                         } else if (row.type === "addPath") {
-                            setScreen({ id: "pathAdd", account: row.account });
+                            setEditing({ type: "path", account: row.account });
                         } else if (row.type === "newAccount") {
-                            setScreen({ id: "create" });
+                            setEditing({ type: "account" });
                         }
                     } else if (input === "p" && row.type !== "newAccount") {
                         const account = row.type === "account" ? row.name : row.account;

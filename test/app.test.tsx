@@ -52,9 +52,9 @@ describe("create", () => {
     it("creates an account from the create row and returns to the list", async () => {
         const { stdin, lastFrame, unmount } = renderApp();
         await delay();
-        stdin.write("\r"); // only row is "+ new account"
+        stdin.write("\r"); // only row is "+ new account" — becomes an input
         await delay();
-        expect(lastFrame()).toContain("New account");
+        expect(lastFrame()).toContain("↵ apply");
         stdin.write("work\r");
         await delay();
         expect(existsSync(join(homedir(), ".claude-work"))).toBe(true);
@@ -152,8 +152,7 @@ describe("base paths", () => {
         await delay();
         stdin.write("\r");
         await delay();
-        expect(lastFrame()).toContain("Add base path for default");
-        expect(lastFrame()).toContain(process.cwd());
+        expect(lastFrame()).toContain(process.cwd()); // inline input, cwd prefilled
         stdin.write("\r"); // accept prefilled cwd — assigns to that account
         await delay();
         expect(loadConfig().basePaths).toEqual({ [process.cwd()]: "~/.claude" });
@@ -173,10 +172,11 @@ describe("base paths", () => {
         await delay();
         stdin.write("\r");
         await delay();
-        expect(lastFrame()).toContain("Add base path");
-        stdin.write(ESC); // esc -> back to the account list
+        expect(lastFrame()).toContain(process.cwd()); // inline input open
+        stdin.write(ESC); // esc -> cancel the inline input
         await delay(600); // lone escape can be held briefly by the input parser
-        expect(lastFrame()).toContain("Select account");
+        expect(lastFrame()).not.toContain(process.cwd());
+        expect(lastFrame()).toContain("+ add path"); // row restored
         stdin.write("p"); // collapse again (cursor is within the account's rows)
         await delay();
         expect(lastFrame()).not.toContain("+ add path");

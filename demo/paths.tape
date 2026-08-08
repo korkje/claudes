@@ -3,7 +3,7 @@ Output demo/paths.gif
 
 Set FontSize 18
 Set Width 880
-Set Height 420
+Set Height 320
 Set Padding 20
 Set Theme "Catppuccin Mocha"
 Set TypingSpeed 75ms

@@ -3,7 +3,7 @@ Output demo/main.gif
 
 Set FontSize 18
 Set Width 880
-Set Height 520
+Set Height 400
 Set Padding 20
 Set Theme "Catppuccin Mocha"
 Set TypingSpeed 75ms

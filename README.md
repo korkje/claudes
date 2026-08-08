@@ -4,6 +4,8 @@
 
 Multi-account launcher for [Claude Code](https://claude.com/claude-code). Keeps any number of independent Claude Code configurations (accounts, settings, history) in `~/.claude-<name>` folders and launches `claude` with `CLAUDE_CONFIG_DIR` pointing at the one you pick.
 
+![demo](demo/demo.gif)
+
 ## Install
 
 ```sh
@@ -56,6 +58,8 @@ When stdin is not a TTY (pipes, scripts), `claudes` skips the UI and auto-resolv
 ## Development
 
 `npm test` builds the CLI and runs the vitest suite: unit tests for the config/account/shell logic, Ink component tests that drive the real UI through a fake terminal, and CLI tests against the built bundle with a stubbed `claude`.
+
+The README demo is scripted with [VHS](https://github.com/charmbracelet/vhs): `npm run build && vhs demo/demo.tape` regenerates `demo/demo.gif` inside a throwaway HOME, so it never touches real accounts.
 
 ## Config
 

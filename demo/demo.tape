@@ -1,10 +1,10 @@
 # Regenerate the README demo: npm run build && vhs demo/demo.tape
 Output demo/demo.gif
 
-Set FontSize 20
-Set Width 960
-Set Height 640
-Set Padding 24
+Set FontSize 18
+Set Width 880
+Set Height 520
+Set Padding 20
 Set Theme "Catppuccin Mocha"
 Set TypingSpeed 75ms
 
@@ -76,4 +76,4 @@ Type "claudes"
 Sleep 300ms
 Enter
 Sleep 5s
-Sleep 3s
+Sleep 6s

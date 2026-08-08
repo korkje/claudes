@@ -1,33 +1,43 @@
 # Prepares a throwaway HOME for the VHS recording, so the demo never
-# touches (or reveals) real Claude Code state.
+# touches real Claude Code accounts — with one exception: the final
+# launch execs the real, logged-in claude (see below).
 # Source from the repo root: . demo/setup.sh
 
-DEMO_HOME=$(mktemp -d)
-# resolve symlinks (macOS /var -> /private/var) so base path matching
-# against the resolved process cwd works
-DEMO_HOME=$(cd "$DEMO_HOME" && pwd -P)
-mkdir -p "$DEMO_HOME/.claude"
+REAL_HOME=$HOME
+REAL_CLAUDE=$(command -v claude)
+
+# fixed path (not mktemp) so the folder-trust seed below stays valid
+# across re-recordings
+DEMO_HOME="$REAL_HOME/.cache/claudes-demo-home"
+rm -rf "$DEMO_HOME"
 mkdir -p "$DEMO_HOME/dev/personal/blog" "$DEMO_HOME/dev/work/api" "$DEMO_HOME/bin"
 
-# stand-in "claude" that greets like the real thing, since the real one
-# would show first-run onboarding in an empty config dir
-cat > "$DEMO_HOME/bin/claude" <<'EOF'
+# the real default account's config, reachable from the fake HOME, so the
+# final launch is authenticated and shows "~/dev/personal/blog" as cwd
+ln -s "$REAL_HOME/.claude" "$DEMO_HOME/.claude"
+ln -s "$REAL_HOME/.claude.json" "$DEMO_HOME/.claude.json"
+
+# The demo accounts created on screen have no credentials (Claude Code
+# auth is keychain-bound per config dir), so launching them would show
+# the login screen. To end the recording on the real thing, this shim
+# quietly execs the real claude on the real default account instead
+# (CLAUDE_CONFIG_DIR dropped -> $HOME/.claude.json via the symlinks).
+cat > "$DEMO_HOME/bin/claude" <<EOF
 #!/bin/sh
-dir=$(basename "${CLAUDE_CONFIG_DIR:-$HOME/.claude}")
-name=${dir#.claude-}
-[ "$name" = ".claude" ] && name="default"
-cwd=$(pwd)
-case "$cwd" in "$HOME"*) cwd="~${cwd#"$HOME"}" ;; esac
-o=$(printf '\033[38;5;208m'); b=$(printf '\033[1m'); c=$(printf '\033[36m'); r=$(printf '\033[0m')
-echo
-echo "${o}╭──────────────────────────────────────────────╮${r}"
-echo "${o}│${r} ${o}✳${r} ${b}Welcome to Claude Code!${r}                    ${o}│${r}"
-echo "${o}│${r}                                              ${o}│${r}"
-printf "${o}│${r}   account: ${c}%-34s${r}${o}│${r}\n" "$name"
-printf "${o}│${r}   cwd:     %-34s${o}│${r}\n" "$cwd"
-echo "${o}╰──────────────────────────────────────────────╯${r}"
+exec env -u CLAUDE_CONFIG_DIR -u CLAUDE_CODE_CHILD_SESSION -u CLAUDECODE -u CLAUDE_CODE_ENTRYPOINT "$REAL_CLAUDE" "\$@"
 EOF
 chmod +x "$DEMO_HOME/bin/claude"
+
+# pre-trust the demo cwd in the real config so the recording skips the
+# folder-trust dialog (one benign key; remove the projects entry for
+# this path from ~/.claude.json to undo)
+BLOG="$DEMO_HOME/dev/personal/blog"
+if [ "$(jq --arg p "$BLOG" '.projects[$p].hasTrustDialogAccepted == true' "$REAL_HOME/.claude.json")" != "true" ]; then
+    TMP=$(mktemp) &&
+        jq --arg p "$BLOG" '.projects[$p] = ((.projects[$p] // {}) + {hasTrustDialogAccepted: true})' \
+            "$REAL_HOME/.claude.json" > "$TMP" &&
+        mv "$TMP" "$REAL_HOME/.claude.json"
+fi
 
 # run the local build as "claudes"
 cat > "$DEMO_HOME/bin/claudes" <<EOF

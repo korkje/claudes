@@ -1,7 +1,7 @@
 {
   "name": "@korkje/claudes",
   "version": "0.1.7",
-  "description": "Multi-account launcher for Claude Code — manage and switch between CLAUDE_CONFIG_DIR profiles",
+  "description": "Multi-account launcher for Claude Code \u2014 manage and switch between CLAUDE_CONFIG_DIR profiles",
   "keywords": [
     "claude",
     "claude-code",
@@ -10,7 +10,7 @@
     "config"
   ],
   "license": "MIT",
-  "author": "Ola Næss Kaldestad <mail@okal.no>",
+  "author": "Ola N\u00e6ss Kaldestad <mail@okal.no>",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/korkje/claudes.git"
@@ -32,7 +32,8 @@
     "typecheck": "tsc --noEmit",
     "pretest": "npm run build",
     "test": "vitest run",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "demo": "npm run build && tsup demo/fake-claude.tsx --format esm --out-dir demo/.build --silent && vhs demo/main.tape && vhs demo/paths.tape && vhs demo/alias.tape"
   },
   "engines": {
     "node": ">=18"

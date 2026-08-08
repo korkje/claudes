@@ -4,7 +4,7 @@
 
 Multi-account launcher for [Claude Code](https://claude.com/claude-code). Keeps any number of independent Claude Code configurations (accounts, settings, history) in `~/.claude-<name>` folders and launches `claude` with `CLAUDE_CONFIG_DIR` pointing at the one you pick.
 
-![demo](demo/demo.gif)
+![demo](demo/main.gif)
 
 ## Install
 
@@ -26,7 +26,7 @@ Everything is managed from the interactive UI:
 | Key | Action |
 | --- | --- |
 | `↑`/`↓` or `j`/`k` | move |
-| `enter` | launch the selected account, or create one via the `+ new account` row |
+| `enter` | launch the selected account; on `+ new account` / `+ add path` rows it opens an inline input (`enter` applies, `esc` cancels) |
 | `d` | delete account (asks for confirmation), or a base path mapping |
 | `p` | show/hide the account's base paths |
 | `esc` | back — quits from the account list |
@@ -39,11 +39,17 @@ On startup the UI checks npm for a newer claudes release in the background and s
 
 Base paths map directories to accounts: starting `claudes` inside a mapped directory preselects that account (longest match wins) and auto-launches it after a short countdown — navigating or using a shortcut cancels (unbound keys are ignored).
 
-They're managed inline: press `p` on an account to expand its paths as an indented list below it (press again to collapse). `d` on a path removes the mapping, and the indented `+ add path` row maps a new directory to that account — the input defaults to your cwd.
+They're managed inline: press `p` on an account to expand its paths as an indented list below it (press again to collapse). `d` on a path removes the mapping, and the indented `+ add path` row turns into an input right in the list (prefilled with your cwd) that maps a new directory to that account.
+
+![base paths](demo/paths.gif)
 
 ## Replacing `claude`
 
-To route plain `claude` through claudes, press `a` in the UI — an interactive toggle that adds/removes the alias in the startup file of your shell (zsh, bash, or fish). It's equivalent to adding this to your `.zshrc`/`.bashrc` yourself:
+To route plain `claude` through claudes, press `a` in the UI — an interactive toggle that adds/removes the alias in the startup file of your shell (zsh, bash, or fish).
+
+![alias](demo/alias.gif)
+
+It's equivalent to adding this to your `.zshrc`/`.bashrc` yourself:
 
 ```sh
 alias claude="claudes --"
@@ -59,7 +65,7 @@ When stdin is not a TTY (pipes, scripts), `claudes` skips the UI and auto-resolv
 
 `npm test` builds the CLI and runs the vitest suite: unit tests for the config/account/shell logic, Ink component tests that drive the real UI through a fake terminal, and CLI tests against the built bundle with a stubbed `claude`.
 
-The README demo is scripted with [VHS](https://github.com/charmbracelet/vhs): `npm run build && vhs demo/demo.tape` regenerates `demo/demo.gif` inside a throwaway HOME, so it never touches real accounts.
+The README demos are scripted with [VHS](https://github.com/charmbracelet/vhs): `npm run demo` regenerates all three GIFs inside throwaway HOMEs, so they never touch real accounts. The claude that "launches" at the end of the main demo is `demo/fake-claude.tsx`, a stand-in Ink screen.
 
 ## Config
 

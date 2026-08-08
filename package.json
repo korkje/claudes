@@ -1,7 +1,7 @@
 {
   "name": "@korkje/claudes",
-  "version": "0.1.7",
-  "description": "Multi-account launcher for Claude Code \u2014 manage and switch between CLAUDE_CONFIG_DIR profiles",
+  "version": "0.1.8",
+  "description": "Multi-account launcher for Claude Code — manage and switch between CLAUDE_CONFIG_DIR profiles",
   "keywords": [
     "claude",
     "claude-code",
@@ -10,7 +10,7 @@
     "config"
   ],
   "license": "MIT",
-  "author": "Ola N\u00e6ss Kaldestad <mail@okal.no>",
+  "author": "Ola Næss Kaldestad <mail@okal.no>",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/korkje/claudes.git"

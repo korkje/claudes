@@ -36,7 +36,7 @@
     "demo": "npm run build && tsup demo/fake-claude.tsx --format esm --out-dir demo/.build --silent && vhs demo/main.tape && vhs demo/paths.tape && vhs demo/alias.tape"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "publishConfig": {
     "access": "public"

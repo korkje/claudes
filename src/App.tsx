@@ -1,7 +1,7 @@
 import { existsSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { Box, Text, useApp, useInput, type Key } from "ink";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
     accountDir,
     accountExists,
@@ -9,6 +9,7 @@ import {
     createAccount,
     DEFAULT_ACCOUNT,
     listAccounts,
+    loginInfo,
     matchBasePath,
     removeAccount,
     validateName,
@@ -36,9 +37,19 @@ type Row =
     | { type: "addPath"; account: string }
     | { type: "newAccount" };
 
+// accounts that only exist as mapping targets (folder deleted, or never
+// created) are listed after the real ones, so their mappings stay visible
+// and removable instead of silently doing nothing
+function withMissing(accounts: string[], basePaths: Record<string, string>): string[] {
+    const missing = [...new Set(Object.values(basePaths))]
+        .filter(name => !accounts.includes(name) && !accountExists(name))
+        .sort();
+    return [...accounts, ...missing];
+}
+
 function buildRows(accounts: string[], basePaths: Record<string, string>, expanded: Set<string>): Row[] {
     const rows: Row[] = [];
-    for (const name of accounts) {
+    for (const name of withMissing(accounts, basePaths)) {
         rows.push({ type: "account", name });
         if (expanded.has(name)) {
             for (const [base, account] of Object.entries(basePaths).sort()) {
@@ -135,8 +146,9 @@ function TextInput({ initial = "", onChange, onSubmit, onCancel }: {
     );
 }
 
-function ConfirmScreen({ message, onResult }: {
+function ConfirmScreen({ message, hint, onResult }: {
     message: string;
+    hint?: string;
     onResult: (confirmed: boolean) => void;
 }) {
     useInput((input, key) => {
@@ -146,10 +158,17 @@ function ConfirmScreen({ message, onResult }: {
     return (
         <Box flexDirection="column">
             <Text color="red">{message}</Text>
+            {hint ? <Text dimColor>{hint}</Text> : null}
             <Text dimColor>y confirm · n/esc cancel</Text>
         </Box>
     );
 }
+
+// on macOS Claude Code keeps the login token in the Keychain (keyed to the
+// config dir), so removing the folder alone leaves that entry behind
+const DELETE_HINT = process.platform === "darwin"
+    ? "The account's login token may remain in the macOS Keychain — run /logout inside it first to clear that too."
+    : undefined;
 
 export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpdate }: {
     onLaunch: (name: string) => void;
@@ -173,14 +192,14 @@ export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpda
     const cwd = process.cwd();
     const matched = matchBasePath(config, cwd);
     const [listIndex, setListIndex] = useState(() => {
-        const preselect = matched ? accounts.indexOf(matched) : -1;
+        const preselect = matched ? withMissing(accounts, config.basePaths ?? {}).indexOf(matched) : -1;
         return preselect >= 0 ? preselect : 0;
     });
 
     // with a path match, count down and auto-launch; navigation or a
     // shortcut cancels (unbound keys are ignored)
     const [countdown, setCountdown] = useState<number | null>(() =>
-        matched && accounts.includes(matched) ? countdownSeconds : null,
+        matched && accountExists(matched) ? countdownSeconds : null,
     );
     useEffect(() => {
         if (countdown === null) return;
@@ -201,6 +220,10 @@ export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpda
         });
         return () => { mounted = false; };
     }, []);
+
+    // who each account is logged in as; state files are re-read only when
+    // the account list changes, not on every keystroke
+    const logins = useMemo(() => new Map(accounts.map(name => [name, loginInfo(name)])), [accounts]);
 
     const updateConfig = (next: Config) => {
         saveConfig(next);
@@ -233,30 +256,47 @@ export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpda
             return setEditError(`Not a directory: ${abs}`);
         }
         const base = contractTilde(abs);
-        updateConfig({ ...config, basePaths: { ...config.basePaths, [base]: account } });
-        setNotice(`${base} → ${accountLabel(account)}`);
+        const previous = config.basePaths?.[base];
+        if (previous === account) {
+            setNotice(`${base} is already mapped to ${accountLabel(account)}`);
+        } else {
+            updateConfig({ ...config, basePaths: { ...config.basePaths, [base]: account } });
+            // a base can map to one account only, so say when this moved it
+            setNotice(`${base} → ${accountLabel(account)}${previous ? ` (was ${accountLabel(previous)})` : ""}`);
+        }
         cancelEdit();
+    };
+
+    // drop every mapping that points at an account
+    const dropMappings = (account: string): { dropped: number; basePaths: Record<string, string> } => {
+        const nextPaths = { ...config.basePaths };
+        let dropped = 0;
+        for (const [base, name] of Object.entries(nextPaths)) {
+            if (name === account) {
+                delete nextPaths[base];
+                dropped++;
+            }
+        }
+        updateConfig({ ...config, basePaths: nextPaths });
+        return { dropped, basePaths: nextPaths };
     };
 
     if (screen.id === "confirmDelete") {
         const { name } = screen;
         return (
             <ConfirmScreen
-                message={`Delete "${accountLabel(name)}" and all its data (${contractTilde(accountDir(name))})?`}
+                message={`Delete "${accountLabel(name)}" and its folder ${contractTilde(accountDir(name))} (settings, history, plugins)?`}
+                hint={DELETE_HINT}
                 onResult={confirmed => {
                     if (confirmed) {
                         removeAccount(name);
-                        const nextConfig = { ...config, basePaths: { ...config.basePaths } };
-                        for (const [base, account] of Object.entries(nextConfig.basePaths)) {
-                            if (account === name) delete nextConfig.basePaths[base];
-                        }
-                        updateConfig(nextConfig);
+                        const { basePaths: nextPaths } = dropMappings(name);
                         const next = listAccounts();
                         setAccounts(next);
                         const nextExpanded = new Set(expanded);
                         nextExpanded.delete(name);
                         setExpanded(nextExpanded);
-                        const rowCount = buildRows(next, nextConfig.basePaths, nextExpanded).length;
+                        const rowCount = buildRows(next, nextPaths, nextExpanded).length;
                         setListIndex(i => Math.max(0, Math.min(i, rowCount - 1)));
                         setNotice(`Removed ${contractTilde(accountDir(name))}`);
                     }
@@ -312,15 +352,30 @@ export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpda
     // main list
     const basePaths = config.basePaths ?? {};
     const rows = buildRows(accounts, basePaths, expanded);
+    const labelWidth = Math.max(...rows.map(row => (row.type === "account" ? accountLabel(row.name).length : 0)));
     const items: ReactNode[] = rows.map(row => {
         if (row.type === "account") {
+            const login = logins.get(row.name);
             let tag: string | null = null;
-            if (row.name === matched) {
-                tag = countdown !== null ? `(${countdown}) launching…` : "(path match)";
+            if (row.name === matched && countdown !== null) {
+                tag = `(${countdown}) launching…`;
+            } else {
+                const tags = [
+                    row.name === matched ? "path match" : null,
+                    accountExists(row.name) ? null : "folder missing",
+                ].filter(Boolean);
+                if (tags.length) tag = `(${tags.join(", ")})`;
             }
+            const exists = accountExists(row.name);
             return (
                 <Text key={`account:${row.name}`}>
-                    {accountLabel(row.name)}
+                    {accountLabel(row.name).padEnd(labelWidth)}
+                    {exists ? (
+                        <Text dimColor>
+                            {"  "}
+                            {login ? `${login.email}${login.organization ? ` (${login.organization})` : ""}` : "not logged in"}
+                        </Text>
+                    ) : null}
                     {tag ? <Text dimColor> {tag}</Text> : null}
                 </Text>
             );
@@ -401,7 +456,9 @@ export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpda
                     const row = rows[index];
                     if (!row) return;
                     if (key.return) {
-                        if (row.type === "account") {
+                        if (row.type === "account" && !accountExists(row.name)) {
+                            setNotice(`${contractTilde(accountDir(row.name))} does not exist — recreate it via "+ new account", or d drops its mappings`);
+                        } else if (row.type === "account") {
                             onLaunch(row.name);
                             exit();
                         } else if (row.type === "addPath") {
@@ -420,6 +477,14 @@ export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpda
                         if (row.type === "account") {
                             if (row.name === DEFAULT_ACCOUNT) {
                                 setNotice("The default account (~/.claude) cannot be deleted");
+                            } else if (!accountExists(row.name)) {
+                                // nothing on disk to confirm: just forget the mappings
+                                const { dropped } = dropMappings(row.name);
+                                const nextExpanded = new Set(expanded);
+                                nextExpanded.delete(row.name);
+                                setExpanded(nextExpanded);
+                                setListIndex(i => Math.max(0, i - 1));
+                                setNotice(`Dropped ${dropped} mapping${dropped === 1 ? "" : "s"} to "${row.name}"`);
                             } else {
                                 setScreen({ id: "confirmDelete", name: row.name });
                             }

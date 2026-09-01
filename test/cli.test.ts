@@ -1,8 +1,8 @@
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
 // spawns the built CLI without a TTY, so this covers the non-interactive
 // path: automatic account resolution and arg passthrough to claude
@@ -62,5 +62,44 @@ describe("argument handling", () => {
         const result = runCli(["--help"], homedir());
         expect(result.status).toBe(0);
         expect(result.stdout).toContain("multi-account launcher");
+    });
+});
+
+describe("signals while claude runs", () => {
+    // a stub claude that reports when it starts and how it was stopped;
+    // "sleep & wait" so the TERM trap fires immediately instead of after sleep
+    const stub = join(binDir, "claude");
+    const trapStub = [
+        "#!/bin/sh",
+        "trap 'echo got-term; exit 3' TERM",
+        "echo started",
+        "sleep 10 & wait $!",
+        "",
+    ].join("\n");
+    const plainStub = '#!/bin/sh\necho "CLAUDE_CONFIG_DIR=${CLAUDE_CONFIG_DIR:-<unset>} args=$*"\nexit 7\n';
+
+    it("survives a SIGINT of its own and forwards SIGTERM to claude", async () => {
+        writeFileSync(stub, trapStub);
+        try {
+            const child = spawn(process.execPath, [distEntry], {
+                cwd: homedir(),
+                env: { ...process.env, HOME: homedir(), PATH: `${binDir}:${process.env.PATH}` },
+                stdio: ["pipe", "pipe", "pipe"],
+            });
+            let stdout = "";
+            child.stdout.on("data", chunk => { stdout += chunk; });
+            const exited = new Promise<number | null>(resolve => child.on("exit", code => resolve(code)));
+            await vi.waitFor(() => expect(stdout).toContain("started"));
+
+            child.kill("SIGINT");
+            await new Promise(resolve => setTimeout(resolve, 300));
+            expect(child.exitCode).toBeNull();
+
+            child.kill("SIGTERM");
+            expect(await exited).toBe(3);
+            expect(stdout).toContain("got-term");
+        } finally {
+            writeFileSync(stub, plainStub);
+        }
     });
 });

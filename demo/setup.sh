@@ -12,6 +12,13 @@ DEMO_HOME=$(cd "$DEMO_HOME" && pwd -P)
 mkdir -p "$DEMO_HOME/.claude" "$DEMO_HOME/.claude-personal" "$DEMO_HOME/.claude-work"
 mkdir -p "$DEMO_HOME/dev/personal/blog" "$DEMO_HOME/dev/work/api" "$DEMO_HOME/bin"
 
+# fake logins, in the shape of Claude Code's state file (~/.claude.json for
+# the default config dir, <dir>/.claude.json otherwise)
+login() { printf '{ "oauthAccount": { "emailAddress": "%s"%s } }\n' "$1" "${2:+, \"organizationName\": \"$2\"}"; }
+login name@example.com            > "$DEMO_HOME/.claude.json"
+login name@personal.example       > "$DEMO_HOME/.claude-personal/.claude.json"
+login name@acme.example Acme      > "$DEMO_HOME/.claude-work/.claude.json"
+
 if [ "$1" = "mapped" ]; then
     cat > "$DEMO_HOME/.claudes.json" <<'EOF'
 {

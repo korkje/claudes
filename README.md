@@ -31,15 +31,21 @@ Everything is managed from the interactive UI:
 | `p` | show/hide the account's base paths |
 | `esc` | back — quits from the account list |
 
+Deleting an account removes its `~/.claude-<name>` folder. On macOS, Claude Code keeps the login token in the Keychain rather than in that folder, so run `/logout` inside the account before deleting it if you want that cleared as well.
+
+Each account row shows who it is logged in as (email, plus organization when there is one), read from Claude Code's own state file, or `not logged in` for a fresh folder.
+
 Your regular `~/.claude` appears as `default (~/.claude)` — listed first (when the folder exists) and impossible to delete. The list preselects the base path match for your working directory, or else the top entry.
 
-On startup the UI checks npm for a newer claudes release in the background and shows a one-line notice when there is one; the check never blocks and failures (e.g. offline) are silent.
+On startup the UI checks npm for a newer claudes release in the background and shows a one-line notice when there is one. The answer is cached for a day in `~/.cache/claudes/` (or `$XDG_CACHE_HOME/claudes/`), so most launches make no request at all; the check never blocks and failures (e.g. offline) are silent.
 
 ## Base paths
 
 Base paths map directories to accounts: starting `claudes` inside a mapped directory preselects that account (longest match wins) and auto-launches it after a short countdown — navigating or using a shortcut cancels (unbound keys are ignored).
 
-They're managed inline: press `p` on an account to expand its paths as an indented list below it (press again to collapse). `d` on a path removes the mapping, and the indented `+ add path` row turns into an input right in the list (prefilled with your cwd) that maps a new directory to that account.
+They're managed inline: press `p` on an account to expand its paths as an indented list below it (press again to collapse). `d` on a path removes the mapping, and the indented `+ add path` row turns into an input right in the list (prefilled with your cwd) that maps a new directory to that account. A directory maps to one account only, so adding one that's already mapped elsewhere moves it (the notice says from where).
+
+If an account's folder disappears, its mappings still show up under a `(folder missing)` row: `d` there drops them, or recreate the account under the same name to revive them.
 
 ![base paths](demo/paths.gif)
 

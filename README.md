@@ -65,6 +65,12 @@ When stdin is not a TTY (pipes, scripts), `claudes` skips the UI and auto-resolv
 
 `npm test` builds the CLI and runs the vitest suite: unit tests for the config/account/shell logic, Ink component tests that drive the real UI through a fake terminal, and CLI tests against the built bundle with a stubbed `claude`.
 
+### Releasing
+
+Releases are cut from the GitHub UI, never from a local `npm version`: draft a release on `main` with a `v<major>.<minor>.<patch>` tag and publish it. The Publish workflow derives the version from the tag, runs typecheck and the suite, and publishes to npm via trusted publishing (with provenance). `package.json` stays at `0.0.0-dev` in git — the tag is the only source of truth, and dev builds skip the update check.
+
+For a pre-release, tag with a suffix (`v0.2.0-next.0`) and tick "Set as a pre-release": anything marked pre-release publishes under the `next` dist-tag without moving `latest`, so `npm i -g @korkje/claudes@next` gets it. The workflow refuses a suffixed tag that is not marked pre-release, and the reverse.
+
 The README demos are scripted with [VHS](https://github.com/charmbracelet/vhs): `npm run demo` regenerates all three GIFs inside throwaway HOMEs, so they never touch real accounts. The claude that "launches" at the end of the main demo is `demo/fake-claude.tsx`, a stand-in Ink screen.
 
 ## Config

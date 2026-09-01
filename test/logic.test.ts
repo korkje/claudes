@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
     accountDir,
     accountLabel,
@@ -13,7 +13,7 @@ import {
     validateName,
 } from "../src/accounts.js";
 import { contractTilde, expandTilde, loadConfig, saveConfig } from "../src/config.js";
-import { currentVersion, isNewer } from "../src/version.js";
+import { checkForUpdate, currentVersion, isDevBuild, isNewer } from "../src/version.js";
 
 export function resetHome(): void {
     for (const entry of readdirSync(homedir())) {
@@ -140,8 +140,16 @@ describe("config", () => {
 });
 
 describe("version", () => {
-    it("reads the package version", () => {
+    it("reads the package version, which is the dev placeholder in git", () => {
         expect(currentVersion()).toMatch(/^\d+\.\d+\.\d+/);
+        expect(isDevBuild()).toBe(true);
+    });
+
+    it("skips the update check for dev builds without touching the network", async () => {
+        const fetchSpy = vi.spyOn(globalThis, "fetch");
+        expect(await checkForUpdate()).toBeNull();
+        expect(fetchSpy).not.toHaveBeenCalled();
+        fetchSpy.mockRestore();
     });
 
     it("compares versions numerically", () => {
@@ -150,6 +158,14 @@ describe("version", () => {
         expect(isNewer("1.0.0", "0.9.9")).toBe(true);
         expect(isNewer("0.1.3", "0.1.3")).toBe(false);
         expect(isNewer("0.1.2", "0.1.3")).toBe(false);
+    });
+
+    it("ranks a release above its own pre-releases only", () => {
+        expect(isNewer("0.2.0", "0.2.0-next.1")).toBe(true);
+        expect(isNewer("0.2.0-next.1", "0.2.0")).toBe(false);
+        expect(isNewer("0.2.0-next.2", "0.2.0-next.1")).toBe(false);
+        expect(isNewer("0.1.9", "0.2.0-next.1")).toBe(false);
+        expect(isNewer("0.2.1", "0.2.0-next.1")).toBe(true);
         expect(isNewer("0.1.3.1", "0.1.3")).toBe(true);
     });
 });

@@ -1,9 +1,17 @@
+# Publishes to npm when a GitHub release is published. The release tag is
+# the single source of truth for the version: package.json stays at
+# 0.0.0-dev in git and is stamped here before publishing.
+#
+# Releases marked "pre-release" publish under the "next" dist-tag, all
+# others under "latest". npm version rejects a tag that is not semver.
+#
+# Keep this file named publish.yml: npm trusted publishing is bound to the
+# workflow filename.
 name: Publish
 
 on:
-  push:
-    tags:
-      - "v*"
+  release:
+    types: [published]
 
 jobs:
   publish:
@@ -12,12 +20,40 @@ jobs:
       contents: read
       id-token: write # npm trusted publishing (OIDC)
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
+          cache: npm
       # trusted publishing needs npm >= 11.5.1
       - run: npm install -g npm@latest
+
+      - name: Version from the tag, dist-tag from the pre-release checkbox
+        id: release
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          PRERELEASE: ${{ github.event.release.prerelease }}
+        run: |
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "dist_tag=$([ "$PRERELEASE" = true ] && echo next || echo latest)" >> "$GITHUB_OUTPUT"
+
+      # a pre-release must carry a suffix (v1.3.0-next.0) and vice versa, or
+      # a pre-release lands on "latest", or a plain version burns its number on "next"
+      - name: Check that the pre-release checkbox matches the tag
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          PRERELEASE: ${{ github.event.release.prerelease }}
+        run: |
+          case "$TAG:$PRERELEASE" in
+            v[0-9]*-*:true)              ;;
+            v[0-9]*-*:false)             echo "::error::$TAG has a pre-release suffix but is not marked as a pre-release"; exit 1 ;;
+            v[0-9]*.[0-9]*.[0-9]*:true)  echo "::error::$TAG is marked as a pre-release but has no suffix (e.g. ${TAG}-next.0)"; exit 1 ;;
+            v[0-9]*.[0-9]*.[0-9]*:false) ;;
+            *)                           echo "::error::$TAG is not a v<major>.<minor>.<patch> tag"; exit 1 ;;
+          esac
+
       - run: npm ci
+      - run: npm run typecheck
       - run: npm test
-      - run: npm publish
+      - run: npm version "${{ steps.release.outputs.version }}" --no-git-tag-version
+      - run: npm publish --tag "${{ steps.release.outputs.dist_tag }}"

@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { expandTilde, type Config } from "./config.js";
@@ -72,4 +72,34 @@ export function matchBasePath(config: Config, cwd: string): string | undefined {
         }
     }
     return best;
+}
+
+export interface LoginInfo {
+    email: string;
+    organization?: string;
+}
+
+// Claude Code's state file: ~/.claude.json for the default config dir,
+// <dir>/.claude.json for any other CLAUDE_CONFIG_DIR
+export function stateFile(name: string): string {
+    return name === DEFAULT_ACCOUNT ? join(homedir(), ".claude.json") : join(accountDir(name), ".claude.json");
+}
+
+// Who the account is logged in as, from the oauthAccount block of the
+// state file. The format is undocumented, so anything unexpected reads as
+// "not logged in" (null) rather than an error.
+export function loginInfo(name: string): LoginInfo | null {
+    try {
+        const { oauthAccount } = JSON.parse(readFileSync(stateFile(name), "utf8")) as {
+            oauthAccount?: { emailAddress?: unknown; organizationName?: unknown };
+        };
+        if (typeof oauthAccount?.emailAddress !== "string") return null;
+        const organization = oauthAccount.organizationName;
+        return {
+            email: oauthAccount.emailAddress,
+            ...(typeof organization === "string" && organization ? { organization } : {}),
+        };
+    } catch {
+        return null;
+    }
 }

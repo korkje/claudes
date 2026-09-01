@@ -8,6 +8,7 @@ import {
     createAccount,
     DEFAULT_ACCOUNT,
     listAccounts,
+    loginInfo,
     matchBasePath,
     removeAccount,
     validateName,
@@ -46,6 +47,31 @@ describe("listAccounts", () => {
         expect(listAccounts()).toEqual([DEFAULT_ACCOUNT, "default"]);
         expect(accountDir("default")).toBe(join(homedir(), ".claude-default"));
         expect(accountDir(DEFAULT_ACCOUNT)).toBe(join(homedir(), ".claude"));
+    });
+});
+
+describe("loginInfo", () => {
+    const state = (email?: string, org?: string) => JSON.stringify({
+        numStartups: 3,
+        ...(email ? { oauthAccount: { emailAddress: email, organizationName: org, accountUuid: "x" } } : {}),
+    });
+
+    it("reads the default account from ~/.claude.json and named ones from their folder", () => {
+        mkdirSync(join(homedir(), ".claude"));
+        mkdirSync(join(homedir(), ".claude-work"));
+        writeFileSync(join(homedir(), ".claude.json"), state("me@example.com"));
+        writeFileSync(join(homedir(), ".claude-work", ".claude.json"), state("me@acme.example", "Acme"));
+        expect(loginInfo(DEFAULT_ACCOUNT)).toEqual({ email: "me@example.com" });
+        expect(loginInfo("work")).toEqual({ email: "me@acme.example", organization: "Acme" });
+    });
+
+    it("is null without a state file, a login, or valid JSON", () => {
+        mkdirSync(join(homedir(), ".claude-fresh"));
+        expect(loginInfo("fresh")).toBeNull();
+        writeFileSync(join(homedir(), ".claude-fresh", ".claude.json"), state());
+        expect(loginInfo("fresh")).toBeNull();
+        writeFileSync(join(homedir(), ".claude-fresh", ".claude.json"), "{ nope");
+        expect(loginInfo("fresh")).toBeNull();
     });
 });
 

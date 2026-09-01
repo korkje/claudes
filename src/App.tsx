@@ -1,7 +1,7 @@
 import { existsSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { Box, Text, useApp, useInput, type Key } from "ink";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
     accountDir,
     accountExists,
@@ -9,6 +9,7 @@ import {
     createAccount,
     DEFAULT_ACCOUNT,
     listAccounts,
+    loginInfo,
     matchBasePath,
     removeAccount,
     validateName,
@@ -220,6 +221,10 @@ export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpda
         return () => { mounted = false; };
     }, []);
 
+    // who each account is logged in as; state files are re-read only when
+    // the account list changes, not on every keystroke
+    const logins = useMemo(() => new Map(accounts.map(name => [name, loginInfo(name)])), [accounts]);
+
     const updateConfig = (next: Config) => {
         saveConfig(next);
         setConfig(next);
@@ -347,8 +352,10 @@ export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpda
     // main list
     const basePaths = config.basePaths ?? {};
     const rows = buildRows(accounts, basePaths, expanded);
+    const labelWidth = Math.max(...rows.map(row => (row.type === "account" ? accountLabel(row.name).length : 0)));
     const items: ReactNode[] = rows.map(row => {
         if (row.type === "account") {
+            const login = logins.get(row.name);
             let tag: string | null = null;
             if (row.name === matched && countdown !== null) {
                 tag = `(${countdown}) launching…`;
@@ -359,9 +366,16 @@ export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpda
                 ].filter(Boolean);
                 if (tags.length) tag = `(${tags.join(", ")})`;
             }
+            const exists = accountExists(row.name);
             return (
                 <Text key={`account:${row.name}`}>
-                    {accountLabel(row.name)}
+                    {accountLabel(row.name).padEnd(labelWidth)}
+                    {exists ? (
+                        <Text dimColor>
+                            {"  "}
+                            {login ? `${login.email}${login.organization ? ` (${login.organization})` : ""}` : "not logged in"}
+                        </Text>
+                    ) : null}
                     {tag ? <Text dimColor> {tag}</Text> : null}
                 </Text>
             );

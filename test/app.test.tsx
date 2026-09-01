@@ -48,6 +48,26 @@ describe("account list", () => {
     });
 });
 
+describe("login labels", () => {
+    it("shows who each account is logged in as, or that it is not", async () => {
+        mkdirSync(join(homedir(), ".claude"));
+        mkdirSync(join(homedir(), ".claude-work"));
+        mkdirSync(join(homedir(), ".claude-fresh"));
+        writeFileSync(join(homedir(), ".claude.json"), JSON.stringify({ oauthAccount: { emailAddress: "me@example.com" } }));
+        writeFileSync(
+            join(homedir(), ".claude-work", ".claude.json"),
+            JSON.stringify({ oauthAccount: { emailAddress: "me@acme.example", organizationName: "Acme" } }),
+        );
+        const { lastFrame, unmount } = renderApp();
+        await delay();
+        const frame = lastFrame()!;
+        expect(frame).toMatch(/default \(~\/.claude\)\s+me@example.com/);
+        expect(frame).toMatch(/work\s+me@acme.example \(Acme\)/);
+        expect(frame).toMatch(/fresh\s+not logged in/);
+        unmount();
+    });
+});
+
 describe("create", () => {
     it("creates an account from the create row and returns to the list", async () => {
         const { stdin, lastFrame, unmount } = renderApp();
@@ -216,7 +236,7 @@ describe("base paths", () => {
         );
         const { stdin, lastFrame, onLaunch, unmount } = renderApp();
         await delay();
-        expect(lastFrame()).toContain("gone (folder missing)");
+        expect(lastFrame()).toMatch(/gone\s+\(folder missing\)/);
         stdin.write("j"); // onto the missing account
         await delay();
         stdin.write("p");
@@ -230,7 +250,7 @@ describe("base paths", () => {
         stdin.write("d");
         await delay();
         expect(lastFrame()).toContain('Dropped 2 mappings to "gone"');
-        expect(lastFrame()).not.toContain("gone (folder missing)");
+        expect(lastFrame()).not.toContain("folder missing");
         expect(loadConfig().basePaths).toEqual({ "~/mine": "~/.claude" });
         unmount();
     });
@@ -301,7 +321,7 @@ describe("countdown", () => {
         mapCwd("work");
         const { lastFrame, unmount } = renderApp({ countdownSeconds: 5 });
         await delay();
-        expect(lastFrame()).toMatch(/work \(5\) launching…/);
+        expect(lastFrame()).toMatch(/work\s+not logged in \(5\) launching…/);
         expect(lastFrame()).not.toContain("(path match)");
         unmount();
     });

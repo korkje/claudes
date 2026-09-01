@@ -12,7 +12,7 @@ Multi-account launcher for [Claude Code](https://claude.com/claude-code). Keeps 
 npm install -g @korkje/claudes
 ```
 
-Requires `claude` on your PATH. Supports macOS and Linux (including WSL); native Windows is untested and unsupported.
+Requires Node 20+ and `claude` on your PATH. Supports macOS and Linux (including WSL); native Windows is untested and unsupported.
 
 ## Usage
 

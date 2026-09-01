@@ -36,9 +36,19 @@ type Row =
     | { type: "addPath"; account: string }
     | { type: "newAccount" };
 
+// accounts that only exist as mapping targets (folder deleted, or never
+// created) are listed after the real ones, so their mappings stay visible
+// and removable instead of silently doing nothing
+function withMissing(accounts: string[], basePaths: Record<string, string>): string[] {
+    const missing = [...new Set(Object.values(basePaths))]
+        .filter(name => !accounts.includes(name) && !accountExists(name))
+        .sort();
+    return [...accounts, ...missing];
+}
+
 function buildRows(accounts: string[], basePaths: Record<string, string>, expanded: Set<string>): Row[] {
     const rows: Row[] = [];
-    for (const name of accounts) {
+    for (const name of withMissing(accounts, basePaths)) {
         rows.push({ type: "account", name });
         if (expanded.has(name)) {
             for (const [base, account] of Object.entries(basePaths).sort()) {
@@ -181,14 +191,14 @@ export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpda
     const cwd = process.cwd();
     const matched = matchBasePath(config, cwd);
     const [listIndex, setListIndex] = useState(() => {
-        const preselect = matched ? accounts.indexOf(matched) : -1;
+        const preselect = matched ? withMissing(accounts, config.basePaths ?? {}).indexOf(matched) : -1;
         return preselect >= 0 ? preselect : 0;
     });
 
     // with a path match, count down and auto-launch; navigation or a
     // shortcut cancels (unbound keys are ignored)
     const [countdown, setCountdown] = useState<number | null>(() =>
-        matched && accounts.includes(matched) ? countdownSeconds : null,
+        matched && accountExists(matched) ? countdownSeconds : null,
     );
     useEffect(() => {
         if (countdown === null) return;
@@ -241,9 +251,29 @@ export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpda
             return setEditError(`Not a directory: ${abs}`);
         }
         const base = contractTilde(abs);
-        updateConfig({ ...config, basePaths: { ...config.basePaths, [base]: account } });
-        setNotice(`${base} → ${accountLabel(account)}`);
+        const previous = config.basePaths?.[base];
+        if (previous === account) {
+            setNotice(`${base} is already mapped to ${accountLabel(account)}`);
+        } else {
+            updateConfig({ ...config, basePaths: { ...config.basePaths, [base]: account } });
+            // a base can map to one account only, so say when this moved it
+            setNotice(`${base} → ${accountLabel(account)}${previous ? ` (was ${accountLabel(previous)})` : ""}`);
+        }
         cancelEdit();
+    };
+
+    // drop every mapping that points at an account
+    const dropMappings = (account: string): { dropped: number; basePaths: Record<string, string> } => {
+        const nextPaths = { ...config.basePaths };
+        let dropped = 0;
+        for (const [base, name] of Object.entries(nextPaths)) {
+            if (name === account) {
+                delete nextPaths[base];
+                dropped++;
+            }
+        }
+        updateConfig({ ...config, basePaths: nextPaths });
+        return { dropped, basePaths: nextPaths };
     };
 
     if (screen.id === "confirmDelete") {
@@ -255,17 +285,13 @@ export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpda
                 onResult={confirmed => {
                     if (confirmed) {
                         removeAccount(name);
-                        const nextConfig = { ...config, basePaths: { ...config.basePaths } };
-                        for (const [base, account] of Object.entries(nextConfig.basePaths)) {
-                            if (account === name) delete nextConfig.basePaths[base];
-                        }
-                        updateConfig(nextConfig);
+                        const { basePaths: nextPaths } = dropMappings(name);
                         const next = listAccounts();
                         setAccounts(next);
                         const nextExpanded = new Set(expanded);
                         nextExpanded.delete(name);
                         setExpanded(nextExpanded);
-                        const rowCount = buildRows(next, nextConfig.basePaths, nextExpanded).length;
+                        const rowCount = buildRows(next, nextPaths, nextExpanded).length;
                         setListIndex(i => Math.max(0, Math.min(i, rowCount - 1)));
                         setNotice(`Removed ${contractTilde(accountDir(name))}`);
                     }
@@ -324,8 +350,14 @@ export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpda
     const items: ReactNode[] = rows.map(row => {
         if (row.type === "account") {
             let tag: string | null = null;
-            if (row.name === matched) {
-                tag = countdown !== null ? `(${countdown}) launching…` : "(path match)";
+            if (row.name === matched && countdown !== null) {
+                tag = `(${countdown}) launching…`;
+            } else {
+                const tags = [
+                    row.name === matched ? "path match" : null,
+                    accountExists(row.name) ? null : "folder missing",
+                ].filter(Boolean);
+                if (tags.length) tag = `(${tags.join(", ")})`;
             }
             return (
                 <Text key={`account:${row.name}`}>
@@ -410,7 +442,9 @@ export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpda
                     const row = rows[index];
                     if (!row) return;
                     if (key.return) {
-                        if (row.type === "account") {
+                        if (row.type === "account" && !accountExists(row.name)) {
+                            setNotice(`${contractTilde(accountDir(row.name))} does not exist — recreate it via "+ new account", or d drops its mappings`);
+                        } else if (row.type === "account") {
                             onLaunch(row.name);
                             exit();
                         } else if (row.type === "addPath") {
@@ -429,6 +463,14 @@ export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpda
                         if (row.type === "account") {
                             if (row.name === DEFAULT_ACCOUNT) {
                                 setNotice("The default account (~/.claude) cannot be deleted");
+                            } else if (!accountExists(row.name)) {
+                                // nothing on disk to confirm: just forget the mappings
+                                const { dropped } = dropMappings(row.name);
+                                const nextExpanded = new Set(expanded);
+                                nextExpanded.delete(row.name);
+                                setExpanded(nextExpanded);
+                                setListIndex(i => Math.max(0, i - 1));
+                                setNotice(`Dropped ${dropped} mapping${dropped === 1 ? "" : "s"} to "${row.name}"`);
                             } else {
                                 setScreen({ id: "confirmDelete", name: row.name });
                             }

@@ -41,7 +41,9 @@ On startup the UI checks npm for a newer claudes release in the background and s
 
 Base paths map directories to accounts: starting `claudes` inside a mapped directory preselects that account (longest match wins) and auto-launches it after a short countdown — navigating or using a shortcut cancels (unbound keys are ignored).
 
-They're managed inline: press `p` on an account to expand its paths as an indented list below it (press again to collapse). `d` on a path removes the mapping, and the indented `+ add path` row turns into an input right in the list (prefilled with your cwd) that maps a new directory to that account.
+They're managed inline: press `p` on an account to expand its paths as an indented list below it (press again to collapse). `d` on a path removes the mapping, and the indented `+ add path` row turns into an input right in the list (prefilled with your cwd) that maps a new directory to that account. A directory maps to one account only, so adding one that's already mapped elsewhere moves it (the notice says from where).
+
+If an account's folder disappears, its mappings still show up under a `(folder missing)` row: `d` there drops them, or recreate the account under the same name to revive them.
 
 ![base paths](demo/paths.gif)
 

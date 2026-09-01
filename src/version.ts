@@ -1,10 +1,15 @@
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
 
 const REGISTRY_URL = "https://registry.npmjs.org/@korkje%2Fclaudes/latest";
 
 // what package.json carries in git; releases stamp the real version from
 // the release tag at publish time
 const DEV_VERSION = "0.0.0-dev";
+
+// how long a registry answer is reused before asking again
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 let cached: string | undefined;
 
@@ -36,11 +41,38 @@ export function isNewer(candidate: string, current: string): boolean {
     return b.pre !== undefined && a.pre === undefined;
 }
 
-// resolves with the latest published version if it is newer than this one,
-// null otherwise — including on any network problem (the check is a hint,
-// never an error) and for dev builds, which have no version to compare
-export async function checkForUpdate(): Promise<string | null> {
-    if (isDevBuild()) return null;
+// the last registry answer, so a launch normally costs no network request
+export function updateCachePath(): string {
+    const cacheHome = process.env.XDG_CACHE_HOME || join(homedir(), ".cache");
+    return join(cacheHome, "claudes", "update-check.json");
+}
+
+interface UpdateCache {
+    checkedAt: string; // ISO timestamp
+    latest: string;
+}
+
+function readCache(now: number): string | null {
+    try {
+        const { checkedAt, latest } = JSON.parse(readFileSync(updateCachePath(), "utf8")) as Partial<UpdateCache>;
+        if (typeof latest !== "string" || typeof checkedAt !== "string") return null;
+        const age = now - Date.parse(checkedAt);
+        return age >= 0 && age < CACHE_TTL_MS ? latest : null;
+    } catch {
+        return null;
+    }
+}
+
+function writeCache(entry: UpdateCache): void {
+    try {
+        mkdirSync(dirname(updateCachePath()), { recursive: true });
+        writeFileSync(updateCachePath(), JSON.stringify(entry, null, 2) + "\n");
+    } catch {
+        // a read-only or missing cache dir just means asking again next time
+    }
+}
+
+async function fetchLatest(now: number): Promise<string | null> {
     try {
         const response = await fetch(REGISTRY_URL, {
             signal: AbortSignal.timeout(3000),
@@ -48,8 +80,25 @@ export async function checkForUpdate(): Promise<string | null> {
         });
         if (!response.ok) return null;
         const { version } = await response.json() as { version?: unknown };
-        return typeof version === "string" && isNewer(version, currentVersion()) ? version : null;
+        if (typeof version !== "string") return null;
+        writeCache({ checkedAt: new Date(now).toISOString(), latest: version });
+        return version;
     } catch {
         return null;
     }
+}
+
+// the latest published version: from the cache while it is fresh, else
+// from the registry (which refreshes the cache); null when neither answers
+export async function latestVersion(now = Date.now()): Promise<string | null> {
+    return readCache(now) ?? await fetchLatest(now);
+}
+
+// resolves with the latest published version if it is newer than this one,
+// null otherwise — including on any network problem (the check is a hint,
+// never an error) and for dev builds, which have no version to compare
+export async function checkForUpdate(): Promise<string | null> {
+    if (isDevBuild()) return null;
+    const latest = await latestVersion();
+    return latest !== null && isNewer(latest, currentVersion()) ? latest : null;
 }

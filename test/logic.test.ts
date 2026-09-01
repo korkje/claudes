@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -13,7 +13,7 @@ import {
     validateName,
 } from "../src/accounts.js";
 import { contractTilde, expandTilde, loadConfig, saveConfig } from "../src/config.js";
-import { checkForUpdate, currentVersion, isDevBuild, isNewer } from "../src/version.js";
+import { checkForUpdate, currentVersion, isDevBuild, isNewer, latestVersion, updateCachePath } from "../src/version.js";
 
 export function resetHome(): void {
     for (const entry of readdirSync(homedir())) {
@@ -167,5 +167,50 @@ describe("version", () => {
         expect(isNewer("0.1.9", "0.2.0-next.1")).toBe(false);
         expect(isNewer("0.2.1", "0.2.0-next.1")).toBe(true);
         expect(isNewer("0.1.3.1", "0.1.3")).toBe(true);
+    });
+});
+
+describe("update check cache", () => {
+    const registryAnswer = (version: string) =>
+        vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ version })));
+    const hour = 60 * 60 * 1000;
+
+    it("asks the registry once, then reuses the answer for a day", async () => {
+        const fetchSpy = registryAnswer("1.2.3");
+        const t0 = Date.parse("2026-09-02T10:00:00Z");
+        expect(await latestVersion(t0)).toBe("1.2.3");
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+        expect(updateCachePath()).toBe(join(homedir(), ".cache", "claudes", "update-check.json"));
+        expect(JSON.parse(readFileSync(updateCachePath(), "utf8"))).toEqual({
+            checkedAt: "2026-09-02T10:00:00.000Z",
+            latest: "1.2.3",
+        });
+
+        fetchSpy.mockResolvedValue(new Response(JSON.stringify({ version: "1.2.4" })));
+        expect(await latestVersion(t0 + 23 * hour)).toBe("1.2.3");
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+        expect(await latestVersion(t0 + 25 * hour)).toBe("1.2.4");
+        expect(fetchSpy).toHaveBeenCalledTimes(2);
+        fetchSpy.mockRestore();
+    });
+
+    it("ignores a malformed cache and does not cache failures", async () => {
+        mkdirSync(join(homedir(), ".cache", "claudes"), { recursive: true });
+        writeFileSync(updateCachePath(), "not json");
+        const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("offline"));
+        expect(await latestVersion()).toBeNull();
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+        expect(readFileSync(updateCachePath(), "utf8")).toBe("not json");
+        fetchSpy.mockRestore();
+    });
+
+    it("honours XDG_CACHE_HOME", () => {
+        process.env.XDG_CACHE_HOME = join(homedir(), "xdg-cache");
+        try {
+            expect(updateCachePath()).toBe(join(homedir(), "xdg-cache", "claudes", "update-check.json"));
+        } finally {
+            delete process.env.XDG_CACHE_HOME;
+        }
     });
 });

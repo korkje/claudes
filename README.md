@@ -35,7 +35,7 @@ Deleting an account removes its `~/.claude-<name>` folder. On macOS, Claude Code
 
 Your regular `~/.claude` appears as `default (~/.claude)` — listed first (when the folder exists) and impossible to delete. The list preselects the base path match for your working directory, or else the top entry.
 
-On startup the UI checks npm for a newer claudes release in the background and shows a one-line notice when there is one; the check never blocks and failures (e.g. offline) are silent.
+On startup the UI checks npm for a newer claudes release in the background and shows a one-line notice when there is one. The answer is cached for a day in `~/.cache/claudes/` (or `$XDG_CACHE_HOME/claudes/`), so most launches make no request at all; the check never blocks and failures (e.g. offline) are silent.
 
 ## Base paths
 

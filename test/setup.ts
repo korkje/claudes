@@ -11,4 +11,5 @@ process.env.HOME = home;
 process.env.SHELL = "/bin/zsh";
 delete process.env.ZDOTDIR;
 delete process.env.XDG_CONFIG_HOME;
+delete process.env.XDG_CACHE_HOME;
 delete process.env.CLAUDE_CONFIG_DIR;

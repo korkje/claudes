@@ -135,8 +135,9 @@ function TextInput({ initial = "", onChange, onSubmit, onCancel }: {
     );
 }
 
-function ConfirmScreen({ message, onResult }: {
+function ConfirmScreen({ message, hint, onResult }: {
     message: string;
+    hint?: string;
     onResult: (confirmed: boolean) => void;
 }) {
     useInput((input, key) => {
@@ -146,10 +147,17 @@ function ConfirmScreen({ message, onResult }: {
     return (
         <Box flexDirection="column">
             <Text color="red">{message}</Text>
+            {hint ? <Text dimColor>{hint}</Text> : null}
             <Text dimColor>y confirm · n/esc cancel</Text>
         </Box>
     );
 }
+
+// on macOS Claude Code keeps the login token in the Keychain (keyed to the
+// config dir), so removing the folder alone leaves that entry behind
+const DELETE_HINT = process.platform === "darwin"
+    ? "The account's login token may remain in the macOS Keychain — run /logout inside it first to clear that too."
+    : undefined;
 
 export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpdate }: {
     onLaunch: (name: string) => void;
@@ -242,7 +250,8 @@ export function App({ onLaunch, countdownSeconds = 3, checkUpdate = checkForUpda
         const { name } = screen;
         return (
             <ConfirmScreen
-                message={`Delete "${accountLabel(name)}" and all its data (${contractTilde(accountDir(name))})?`}
+                message={`Delete "${accountLabel(name)}" and its folder ${contractTilde(accountDir(name))} (settings, history, plugins)?`}
+                hint={DELETE_HINT}
                 onResult={confirmed => {
                     if (confirmed) {
                         removeAccount(name);
